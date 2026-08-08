@@ -14,6 +14,9 @@ data/
 *.db
 *.sqlite3
 
+# Logs
+logs/
+
 # OS specific
 .DS_Store
 Thumbs.db

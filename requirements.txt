@@ -1,9 +1,5 @@
 streamlit
-insightface
-onnxruntime-gpu
-opencv-python
-scikit-learn
-Pillow
-numpy
 supabase
 requests
+python-dotenv
+Pillow
