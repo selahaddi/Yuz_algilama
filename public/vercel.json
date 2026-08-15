@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "https://real-plums-push.loca.lt/api/$1"
+    }
+  ]
+}

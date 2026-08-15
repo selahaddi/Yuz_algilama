@@ -1,0 +1,24 @@
+# SaaS Dönüşümü Görev Listesi
+
+- [x] Mevcut projeyi yeni bir klasöre kopyala (Yedekleme)
+- [x] Veritabanı (Supabase) Şema Güncellemeleri
+  - [x] `studios` ve `events` tablolarını oluştur
+  - [x] `photos` ve `faces` tablolarını güncelle (event_id, thumbnail_url, vb.)
+  - [x] Supabase Auth (Kayıt/Giriş) kurallarını ayarla
+  - [x] Selfie araması için `match_faces` RPC fonksiyonunu oluştur
+- [x] Arka Plan (Worker) Güncellemeleri
+  - [x] Fotoğraf indirildiğinde Thumbnail oluşturup Storage'a kaydetme
+  - [x] Yeni veritabanı şemasına göre (event_id bazlı) işlemleri güncelleme
+  - [x] DBSCAN'in etkinlik bazlı çalışacak şekilde güncellenmesi
+- [x] `studio_app.py` Geliştirilmesi
+  - [x] Stüdyo Kayıt/Giriş Ekranı (Supabase Auth)
+  - [x] Etkinlik Oluşturma ve Listeleme
+  - [x] Etkinliğe Fotoğraf Yükleme (event_id ile)
+  - [x] Misafir için QR/Link Paylaşım Ekranı
+- [x] `guest_app.py` Geliştirilmesi
+  - [x] Seçili etkinliğe giriş karşılama ve KVKK onayı
+  - [x] Yöntem 1: Selfie ile arama (Kamera veya Dosya yükleme) -> `match_faces` RPC
+  - [x] Yöntem 2: Listeden Küme (Kişi) Seçme (Eski yöntem)
+  - [x] Eşleşen/Seçilen fotoğrafların Thumbnail'lerle gösterilmesi
+  - [x] Orijinal indirme butonu
+- [x] Test ve Doğrulama (Hazır)

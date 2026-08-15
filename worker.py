@@ -6,6 +6,8 @@ import logging
 import requests
 import numpy as np
 import cv2
+from io import BytesIO
+from PIL import Image
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
@@ -55,25 +57,29 @@ RECLUSTER_EVERY_N = 10      # Kaç fotoğraftan sonra yeniden kümeleme yapıls�
 POLL_INTERVAL = 3            # Kuyruk boşken bekleme süresi (saniye)
 ERROR_BACKOFF_INITIAL = 5    # İlk hata bekleme süresi (saniye)
 ERROR_BACKOFF_MAX = 60       # Maksimum hata bekleme süresi (saniye)
-MIN_FACE_SIZE = 120          # Piksel cinsinden minimum yüz boyutu (Arka planı elemek için artırıldı)
+MIN_FACE_SIZE = 120          # Piksel cinsinden minimum yüz boyutu
 MIN_DET_SCORE = 0.7          # Minimum yüz tespit doğruluk skoru
-MIN_BLUR_SCORE = 15.0        # Minimum bulanıklık eşiği (Laplacian varyansı)
+MIN_BLUR_SCORE = 15.0        # Minimum bulanıklık eşiği
+THUMBNAIL_MAX_SIZE = 800     # Maksimum thumbnail boyutu (piksel)
 
-
-def update_clusters(clusterer: FaceClusterer):
+def update_clusters_for_event(clusterer: FaceClusterer, event_id: str):
     """
-    Tüm veritabanındaki yüz vektörlerini çeker, yeniden kümeleme (DBSCAN) yapar.
+    Belirli bir etkinliğe ait tüm yüz vektörlerini çeker, yeniden kümeleme (DBSCAN) yapar.
     Önceki küme atamaları ile karşılaştırarak kararlı (stabil) ID'ler atar
     ve sadece değişenleri veritabanında günceller.
     """
-    logger.info("Tüm yüzler veritabanından çekiliyor ve yeniden kümeleniyor...")
+    logger.info(f"[{event_id}] Etkinliği için yüzler kümeleniyor...")
     
-    # Tüm yüzleri ve vektörleri çek
-    response = supabase.table("faces").select("id, embedding, cluster_id").execute()
+    # Sadece o etkinliğe ait yüzleri çek (photo_id üzerinden)
+    response = supabase.table("faces") \
+        .select("id, embedding, cluster_id, photos!inner(event_id)") \
+        .eq("photos.event_id", event_id) \
+        .execute()
+        
     faces_data = response.data
     
     if not faces_data:
-        logger.info("Veritabanında yüz bulunamadı.")
+        logger.info(f"[{event_id}] Veritabanında yüz bulunamadı.")
         return
         
     embeddings = []
@@ -85,7 +91,6 @@ def update_clusters(clusterer: FaceClusterer):
         old_cluster_ids.append(row.get("cluster_id"))
         emb = row["embedding"]
         
-        # pgvector veriyi string "[0.1, 0.2, ...]" olarak veya liste olarak döndürebilir.
         if isinstance(emb, str):
             emb = json.loads(emb)
             
@@ -95,61 +100,45 @@ def update_clusters(clusterer: FaceClusterer):
     new_labels = clusterer.cluster(embeddings)
     
     # ─── Küme Kararlılığı (Cluster Stability) ──────────────────────────────
-    # DBSCAN her çalıştığında farklı sıra ile farklı ID'ler atayabilir.
-    # Önceki atamaları referans alarak yeni ID'leri eşleştiriyoruz.
     stabilized_labels = _stabilize_cluster_ids(old_cluster_ids, new_labels)
     
     # ─── Toplu Güncelleme (Batch Update) ───────────────────────────────────
-    # Sadece gerçekten değişen kayıtları güncelle (gereksiz API çağrısı önlenir)
     updates_count = 0
     for face_id, old_label, new_label in zip(face_ids, old_cluster_ids, stabilized_labels):
         if old_label != new_label:
-            supabase.table("faces").update({"cluster_id": new_label}).eq("id", face_id).execute()
+            supabase.table("faces").update({"cluster_id": int(new_label)}).eq("id", face_id).execute()
             updates_count += 1
         
     unique_people = len(set(label for label in stabilized_labels if label != -1))
     logger.info(
-        f"Kümeleme tamamlandı! {len(faces_data)} yüz -> {unique_people} kişi. "
+        f"[{event_id}] Kümeleme tamamlandı! {len(faces_data)} yüz -> {unique_people} kişi. "
         f"{updates_count} kayıt güncellendi."
     )
 
-
 def _stabilize_cluster_ids(old_ids: list, new_ids: list) -> list:
-    """
-    Yeni küme ID'lerini eski atamalara göre eşleştirip kararlı hale getirir.
-    
-    Mantık: Her yeni küme ID'si (new_label) için, o kümedeki yüzlerin
-    çoğunluğunun daha önce hangi eski kümeye (old_label) ait olduğuna bakar.
-    Böylece "Kişi 1" her zaman aynı kişiyi ifade eder.
-    """
     if not old_ids or all(o is None for o in old_ids):
-        # İlk kümeleme — doğrudan yeni ID'leri kullan
         return new_ids
     
     from collections import Counter
     
-    # Yeni -> Eski eşleme tablosu oluştur
     new_to_old_votes = {}
     for old_id, new_id in zip(old_ids, new_ids):
         if new_id == -1:
-            continue  # Gürültü noktalarını atla
+            continue
         if new_id not in new_to_old_votes:
             new_to_old_votes[new_id] = Counter()
         if old_id is not None and old_id != -1:
             new_to_old_votes[new_id][old_id] += 1
     
-    # Çoğunluk oylaması ile yeni->eski eşleme belirle
     new_to_stable = {}
     used_old_ids = set()
     
-    # Önce en güçlü eşleşmeleri (en çok oy alanları) ata
     mapping_candidates = []
     for new_id, votes in new_to_old_votes.items():
         if votes:
             best_old_id, best_count = votes.most_common(1)[0]
             mapping_candidates.append((best_count, new_id, best_old_id))
     
-    # En güçlü eşleşmeden zayıfa doğru sırala
     mapping_candidates.sort(reverse=True)
     
     for _, new_id, old_id in mapping_candidates:
@@ -157,7 +146,6 @@ def _stabilize_cluster_ids(old_ids: list, new_ids: list) -> list:
             new_to_stable[new_id] = old_id
             used_old_ids.add(old_id)
     
-    # Eşleşemeyen yeni kümelere yeni ID ata
     max_existing_id = max(
         (oid for oid in old_ids if oid is not None and oid != -1),
         default=-1
@@ -170,26 +158,50 @@ def _stabilize_cluster_ids(old_ids: list, new_ids: list) -> list:
         if new_id not in new_to_stable:
             new_to_stable[new_id] = next_id
             next_id += 1
-    
-    # Sonuç listesini oluştur
+            
     return [
         -1 if label == -1 else new_to_stable.get(label, label)
         for label in new_ids
     ]
 
+def generate_and_upload_thumbnail(img_cv2, photo_id: str) -> str:
+    """Orijinal resmi boyutlandırır, sıkıştırır ve Storage'a thumbnail olarak yükler."""
+    try:
+        # BGR'den RGB'ye çevir ve PIL Image oluştur
+        img_rgb = cv2.cvtColor(img_cv2, cv2.COLOR_BGR2RGB)
+        pil_img = Image.fromarray(img_rgb)
+        
+        # Boyutlandırma (Oranı koruyarak max boyuta uyarla)
+        pil_img.thumbnail((THUMBNAIL_MAX_SIZE, THUMBNAIL_MAX_SIZE), Image.Resampling.LANCZOS)
+        
+        # Bytes'a çevir (JPEG kalitesi 75 ile)
+        buf = BytesIO()
+        pil_img.save(buf, format="JPEG", quality=75)
+        file_bytes = buf.getvalue()
+        
+        # Dosya adı ve upload
+        file_name = f"thumbnails/{photo_id}.jpg"
+        
+        # Mevcut bucket: wedding_photos. Eğer hata verirse storage RLS'sini kontrol etmek gerekebilir.
+        supabase.storage.from_("wedding_photos").upload(
+            file_name, 
+            file_bytes, 
+            {"content-type": "image/jpeg"}
+        )
+        
+        public_url = supabase.storage.from_("wedding_photos").get_public_url(file_name)
+        return public_url
+    except Exception as e:
+        logger.error(f"Thumbnail oluşturulamadı ({photo_id}): {e}")
+        return None
 
 def process_single_photo(analyzer: FaceAnalyzer, photo: dict) -> int:
-    """
-    Tek bir fotoğrafı indir, analiz et ve geçerli yüzleri veritabanına kaydet.
-    
-    :return: Kaydedilen geçerli yüz sayısı
-    """
     photo_id = photo["id"]
+    event_id = photo.get("event_id")
     url = photo["image_url"]
     
     logger.info(f"  Fotoğraf işleniyor: {url[:80]}...")
     
-    # Fotoğrafı indir ve OpenCV formatına çevir
     try:
         response = requests.get(url, timeout=15)
         response.raise_for_status()
@@ -204,8 +216,8 @@ def process_single_photo(analyzer: FaceAnalyzer, photo: dict) -> int:
         logger.warning(f"Fotoğraf decode edilemedi: {url[:60]}")
         supabase.table("photos").update({"processed": True}).eq("id", photo_id).execute()
         return 0
-    
-    # Yüzleri tespit et ve vektörleri çıkar
+        
+    # Yüzleri tespit et
     faces = analyzer.analyze_image(img)
     logger.info(f"   => Fotoğrafta {len(faces)} yüz bulundu.")
     
@@ -214,17 +226,14 @@ def process_single_photo(analyzer: FaceAnalyzer, photo: dict) -> int:
         bbox = face.bbox.astype(float).tolist()
         x1, y1, x2, y2 = bbox
         
-        # 1. BOYUT FİLTRESİ
         width = x2 - x1
         height = y2 - y1
         if width < MIN_FACE_SIZE or height < MIN_FACE_SIZE:
             continue
             
-        # 2. DOĞRULUK FİLTRESİ
         if face.det_score < MIN_DET_SCORE:
             continue
             
-        # 3. BULANIKLIK FİLTRESİ
         try:
             crop_img = img[max(0, int(y1)):min(img.shape[0], int(y2)), 
                          max(0, int(x1)):min(img.shape[1], int(x2))]
@@ -240,7 +249,6 @@ def process_single_photo(analyzer: FaceAnalyzer, photo: dict) -> int:
         
         embedding = face.embedding.astype(float).tolist()
         
-        # Geçerli yüzü Supabase'e kaydet
         supabase.table("faces").insert({
             "photo_id": photo_id,
             "embedding": embedding,
@@ -251,11 +259,17 @@ def process_single_photo(analyzer: FaceAnalyzer, photo: dict) -> int:
         
     logger.info(f"   => {valid_faces_count} adet net/geçerli yüz kaydedildi.")
     
-    # Fotoğrafı kuyruktan çıkar
-    supabase.table("photos").update({"processed": True}).eq("id", photo_id).execute()
+    # Thumbnail üret
+    thumbnail_url = generate_and_upload_thumbnail(img, photo_id)
+    
+    # Kaydı güncelle
+    update_data = {"processed": True}
+    if thumbnail_url:
+        update_data["thumbnail_url"] = thumbnail_url
+        
+    supabase.table("photos").update(update_data).eq("id", photo_id).execute()
     
     return valid_faces_count
-
 
 def start_worker():
     logger.info("Yapay Zeka Modelleri Yükleniyor (GPU aktif)...")
@@ -264,13 +278,12 @@ def start_worker():
     logger.info("Worker Başlatıldı ve Supabase Kuyruğunu (Queue) Dinliyor...")
     logger.info(f"   Yapılandırma: batch_size={BATCH_SIZE}, recluster_every={RECLUSTER_EVERY_N}")
 
-    processed_since_cluster = 0
+    event_processed_counts = {}
     error_backoff = ERROR_BACKOFF_INITIAL
     consecutive_errors = 0
 
     while True:
         try:
-            # Kuyruktan işlenmemiş fotoğrafları batch halinde al
             res = supabase.table("photos") \
                 .select("*") \
                 .eq("processed", False) \
@@ -278,42 +291,45 @@ def start_worker():
                 .execute()
             
             if res.data:
-                total_valid_faces = 0
-                
                 for photo in res.data:
+                    event_id = photo.get("event_id")
+                    if not event_id:
+                        # Event ID'si olmayan fotoğraflar (Eski kalıntı veya hatalı)
+                        supabase.table("photos").update({"processed": True}).eq("id", photo["id"]).execute()
+                        continue
+                        
                     valid_count = process_single_photo(analyzer, photo)
-                    total_valid_faces += valid_count
+                    
+                    if event_id not in event_processed_counts:
+                        event_processed_counts[event_id] = 0
+                    event_processed_counts[event_id] += 1
                 
-                processed_since_cluster += len(res.data)
+                # Belirli bir event'in işlenen fotoğraf sayısı limiti aştıysa, o eventi kümele
+                events_to_cluster = []
+                for eid, count in event_processed_counts.items():
+                    if count >= RECLUSTER_EVERY_N:
+                        events_to_cluster.append(eid)
+                        
+                for eid in events_to_cluster:
+                    update_clusters_for_event(clusterer, eid)
+                    event_processed_counts[eid] = 0
                 
-                # Yeni geçerli yüzler eklendiğinde ve eşik aşıldığında yeniden kümele
-                if total_valid_faces > 0 and processed_since_cluster >= RECLUSTER_EVERY_N:
-                    update_clusters(clusterer)
-                    processed_since_cluster = 0
-                
-                logger.info(
-                    f"Tur tamamlandı: {len(res.data)} fotoğraf işlendi. "
-                    f"Sonraki kümelemeye {RECLUSTER_EVERY_N - processed_since_cluster} fotoğraf kaldı."
-                )
-                
-                # Başarılı işlem — hata sayacını sıfırla
+                logger.info(f"Tur tamamlandı: {len(res.data)} fotoğraf işlendi.")
                 consecutive_errors = 0
                 error_backoff = ERROR_BACKOFF_INITIAL
                 
             else:
-                # Kuyruk boşsa bekle
                 time.sleep(POLL_INTERVAL)
                 
         except KeyboardInterrupt:
             logger.info("Worker kullanıcı tarafından durduruldu (Ctrl+C).")
-            
-            # Son kez kümeleme yap (işlenmiş ama henüz kümelenmemiş yüzler varsa)
-            if processed_since_cluster > 0:
-                logger.info("Kapanmadan önce son kümeleme yapılıyor...")
-                try:
-                    update_clusters(clusterer)
-                except Exception:
-                    pass
+            # Kapanmadan önce işlenmiş ama kümelenmemiş eventleri son kez kümele
+            for eid, count in event_processed_counts.items():
+                if count > 0:
+                    try:
+                        update_clusters_for_event(clusterer, eid)
+                    except Exception:
+                        pass
             break
             
         except Exception as e:
@@ -322,18 +338,12 @@ def start_worker():
                 f"Beklenmeyen Hata (ardışık #{consecutive_errors}): {e}",
                 exc_info=True
             )
-            
-            # Üstel geri çekilme (exponential backoff)
             time.sleep(error_backoff)
             error_backoff = min(error_backoff * 2, ERROR_BACKOFF_MAX)
             
             if consecutive_errors >= 10:
-                logger.critical(
-                    f"10 ardışık hata oluştu. Worker durduruluyor. "
-                    f"Son hata: {e}"
-                )
+                logger.critical(f"10 ardışık hata oluştu. Worker durduruluyor. Son hata: {e}")
                 sys.exit(1)
-
 
 if __name__ == "__main__":
     start_worker()
