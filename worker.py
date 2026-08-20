@@ -10,25 +10,20 @@ from io import BytesIO
 from PIL import Image
 from supabase import create_client, Client
 from dotenv import load_dotenv
+import concurrent.futures
+import threading
 
 # Yapay Zeka Modüllerini İçe Aktar
 from core.face_analyzer import FaceAnalyzer
 from core.clusterer import FaceClusterer
 
 # ─── Loglama Yapılandırması ────────────────────────────────────────────────────
-LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
-os.makedirs(LOG_DIR, exist_ok=True)
-
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
     handlers=[
-        logging.StreamHandler(),  # Terminale yaz
-        logging.FileHandler(      # Dosyaya yaz
-            os.path.join(LOG_DIR, "worker.log"),
-            encoding="utf-8"
-        ),
+        logging.StreamHandler(),  # Sadece terminale yaz (Cloud Logging otomatik yakalar)
     ],
 )
 logger = logging.getLogger("worker")
@@ -217,7 +212,7 @@ def process_single_photo(analyzer: FaceAnalyzer, photo: dict) -> int:
         supabase.table("photos").update({"processed": True}).eq("id", photo_id).execute()
         return 0
         
-    # Yüzleri tespit et
+    # Yüzleri tespit et (Thread-safe yapmak için lock kullanabiliriz ancak ONNXRuntime genellikle sorun çıkarmaz. Yine de ağ I/O çok zaman alıyor)
     faces = analyzer.analyze_image(img)
     logger.info(f"   => Fotoğrafta {len(faces)} yüz bulundu.")
     
@@ -291,18 +286,29 @@ def start_worker():
                 .execute()
             
             if res.data:
-                for photo in res.data:
+                # Fotoğrafları paralel (aynı anda) işlemek için ThreadPoolExecutor kullan
+                def process_task(photo):
                     event_id = photo.get("event_id")
                     if not event_id:
-                        # Event ID'si olmayan fotoğraflar (Eski kalıntı veya hatalı)
                         supabase.table("photos").update({"processed": True}).eq("id", photo["id"]).execute()
-                        continue
+                        return None, 0
                         
-                    valid_count = process_single_photo(analyzer, photo)
-                    
-                    if event_id not in event_processed_counts:
-                        event_processed_counts[event_id] = 0
-                    event_processed_counts[event_id] += 1
+                    try:
+                        valid_count = process_single_photo(analyzer, photo)
+                        return event_id, valid_count
+                    except Exception as photo_err:
+                        logger.error(f"Fotoğraf işlenirken kritik hata oluştu ({photo.get('id')}): {photo_err}")
+                        supabase.table("photos").update({"processed": True}).eq("id", photo["id"]).execute()
+                        return event_id, 0
+
+                with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+                    results = list(executor.map(process_task, res.data))
+                
+                for event_id, _ in results:
+                    if event_id:
+                        if event_id not in event_processed_counts:
+                            event_processed_counts[event_id] = 0
+                        event_processed_counts[event_id] += 1
                 
                 # Belirli bir event'in işlenen fotoğraf sayısı limiti aştıysa, o eventi kümele
                 events_to_cluster = []
@@ -319,7 +325,15 @@ def start_worker():
                 error_backoff = ERROR_BACKOFF_INITIAL
                 
             else:
-                time.sleep(POLL_INTERVAL)
+                logger.info("İşlenecek fotoğraf kalmadı. Worker sonlanıyor (Cloud Run Job mode).")
+                # İşlenmiş ama kümelenmemiş eventleri son kez kümele
+                for eid, count in event_processed_counts.items():
+                    if count > 0:
+                        try:
+                            update_clusters_for_event(clusterer, eid)
+                        except Exception:
+                            pass
+                break
                 
         except KeyboardInterrupt:
             logger.info("Worker kullanıcı tarafından durduruldu (Ctrl+C).")

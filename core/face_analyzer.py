@@ -11,8 +11,8 @@ class FaceAnalyzer:
         # Define providers to prioritize GPU
         providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
         
-        # 'buffalo_l' is the default and most accurate model package in InsightFace
-        self.app = FaceAnalysis(name='buffalo_l', providers=providers)
+        # 'buffalo_s' is a smaller, much faster model with good accuracy.
+        self.app = FaceAnalysis(name='buffalo_s', providers=providers)
         
         # Prepare the model. ctx_id=0 means GPU 0. If no GPU, it will use CPU.
         # det_size is the input size for the detection model. 640x640 is a good balance of speed and accuracy.

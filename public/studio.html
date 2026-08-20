@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stüdyo Yönetim Paneli</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f9f9f9; color: #1a1c1c; }
+        .glass-panel { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.3); }
+        .hidden { display: none !important; }
+        .btn-primary { background: #685d4a; color: white; transition: all 0.2s; }
+        .btn-primary:hover { background: #4f4533; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(104, 93, 74, 0.2); }
+        .btn-outline { border: 1px solid #cec5ba; color: #4b463d; transition: all 0.2s; }
+        .btn-outline:hover { background: #f0e0c8; border-color: #685d4a; color: #1a1c1c; }
+        .input-field { width: 100%; padding: 12px 16px; border-radius: 8px; border: 1px solid #cec5ba; outline: none; transition: border-color 0.2s; background: white; }
+        .input-field:focus { border-color: #685d4a; box-shadow: 0 0 0 2px rgba(104, 93, 74, 0.1); }
+        
+        /* Spinner */
+        .spinner { border: 3px solid rgba(0, 0, 0, 0.1); border-top-color: #685d4a; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="min-h-screen flex text-on-background">
+
+    <!-- AUTHENTICATION VIEW -->
+    <div id="auth-view" class="w-full flex items-center justify-center p-6 min-h-screen relative overflow-hidden">
+        <div class="absolute inset-0 bg-gradient-to-br from-[#f0e0c8] to-[#f9f9f9] pointer-events-none -z-10"></div>
+        <div class="glass-panel w-full max-w-md p-6 md:p-8 rounded-3xl shadow-xl">
+            <div class="text-center mb-8">
+                <span class="material-symbols-outlined text-5xl text-[#685d4a] mb-4 block">storefront</span>
+                <h1 class="text-3xl font-bold text-[#1a1c1c]">Stüdyo Paneli</h1>
+                <p class="text-[#696868] mt-2">Sisteme giriş yapın veya yeni bir hesap oluşturun.</p>
+            </div>
+
+            <!-- Tab Switcher -->
+            <div class="flex p-1 bg-[#eeeeee] rounded-xl mb-6">
+                <button id="tab-login" class="flex-1 py-2 text-sm font-medium rounded-lg bg-white shadow text-[#1a1c1c]" onclick="switchAuthTab('login')">Giriş Yap</button>
+                <button id="tab-register" class="flex-1 py-2 text-sm font-medium rounded-lg text-[#696868] hover:text-[#1a1c1c]" onclick="switchAuthTab('register')">Kayıt Ol</button>
+            </div>
+
+            <!-- Messages -->
+            <div id="auth-message" class="hidden mb-4 p-3 rounded-lg text-sm"></div>
+
+            <!-- Login Form -->
+            <form id="login-form" onsubmit="handleLogin(event)" class="flex flex-col gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-[#4b463d] mb-1">E-Posta</label>
+                    <input type="email" id="login-email" class="input-field" required>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-[#4b463d] mb-1">Şifre</label>
+                    <input type="password" id="login-password" class="input-field" required>
+                </div>
+                <button type="submit" class="btn-primary w-full py-3 rounded-xl font-medium mt-2 flex items-center justify-center gap-2">
+                    <span id="login-spinner" class="spinner hidden"></span>
+                    Giriş Yap
+                </button>
+            </form>
+
+            <!-- Register Form -->
+            <form id="register-form" onsubmit="handleRegister(event)" class="hidden flex flex-col gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-[#4b463d] mb-1">Stüdyo Adı</label>
+                    <input type="text" id="reg-name" class="input-field" required>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-[#4b463d] mb-1">E-Posta</label>
+                    <input type="email" id="reg-email" class="input-field" required>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-[#4b463d] mb-1">Şifre</label>
+                    <input type="password" id="reg-password" class="input-field" required>
+                </div>
+                <button type="submit" class="btn-primary w-full py-3 rounded-xl font-medium mt-2 flex items-center justify-center gap-2">
+                    <span id="reg-spinner" class="spinner hidden"></span>
+                    Kayıt Ol
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MAIN APP VIEW (DASHBOARD) -->
+    <div id="app-view" class="hidden w-full h-screen flex flex-col md:flex-row overflow-hidden">
+        <!-- Sidebar -->
+        <div class="w-full md:w-80 bg-white border-b md:border-b-0 md:border-r border-[#e2e2e2] flex flex-col shadow-sm z-10 shrink-0 max-h-[40vh] md:max-h-none">
+            <div class="p-6 border-b border-[#e2e2e2] flex items-center justify-between">
+                <div>
+                    <h2 class="text-lg font-bold truncate" id="sidebar-studio-name">Stüdyo</h2>
+                    <p class="text-xs text-[#696868]" id="sidebar-studio-email">Yükleniyor...</p>
+                </div>
+                <button onclick="handleLogout()" title="Çıkış Yap" class="p-2 rounded-full hover:bg-[#f3f3f4] text-[#696868] transition-colors">
+                    <span class="material-symbols-outlined">logout</span>
+                </button>
+            </div>
+            
+            <div class="p-4 flex-1 overflow-y-auto">
+                <h3 class="text-xs font-bold text-[#696868] uppercase tracking-wider mb-4 px-2">Etkinlikleriniz</h3>
+                
+                <div id="event-list" class="flex flex-col gap-1">
+                    <!-- Events will be populated here -->
+                </div>
+            </div>
+
+            <div class="p-4 border-t border-[#e2e2e2]">
+                <button onclick="toggleNewEventModal(true)" class="btn-outline w-full py-3 rounded-xl font-medium flex items-center justify-center gap-2">
+                    <span class="material-symbols-outlined text-[20px]">add</span>
+                    Yeni Etkinlik
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Content (Event Details) -->
+        <div class="flex-1 bg-[#f9f9f9] h-full overflow-y-auto relative" id="main-content">
+            <!-- Empty State -->
+            <div id="empty-state" class="absolute inset-0 flex flex-col items-center justify-center text-center p-8">
+                <div class="w-24 h-24 rounded-full bg-[#f0e0c8] text-[#685d4a] flex items-center justify-center mb-6">
+                    <span class="material-symbols-outlined text-5xl">folder_open</span>
+                </div>
+                <h2 class="text-2xl font-bold mb-2">Etkinlik Seçin</h2>
+                <p class="text-[#696868] max-w-sm">Sol menüden bir etkinlik seçerek fotoğrafları yönetebilir veya yeni bir etkinlik oluşturabilirsiniz.</p>
+            </div>
+
+            <!-- Event Details -->
+            <div id="event-details" class="hidden max-w-4xl mx-auto p-8 pt-12 pb-24">
+                <div class="flex justify-between items-end mb-8">
+                    <div>
+                        <span class="text-xs font-bold text-[#685d4a] uppercase tracking-widest" id="detail-date">Tarih</span>
+                        <h1 class="text-4xl font-bold mt-1 text-[#1a1c1c] tracking-tight" id="detail-title">Etkinlik Adı</h1>
+                    </div>
+                </div>
+
+                <!-- Event Stats -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                    <div class="glass-panel p-4 rounded-xl text-center shadow-sm">
+                        <p class="text-xs text-[#696868] font-bold uppercase">Toplam Fotoğraf</p>
+                        <p class="text-3xl font-bold mt-1 text-[#685d4a]" id="stat-total">-</p>
+                    </div>
+                    <div class="glass-panel p-4 rounded-xl text-center shadow-sm">
+                        <p class="text-xs text-[#696868] font-bold uppercase">Bulunan Kişi</p>
+                        <p class="text-3xl font-bold mt-1 text-[#685d4a]" id="stat-people">-</p>
+                    </div>
+                    <div class="glass-panel p-4 rounded-xl text-center shadow-sm">
+                        <p class="text-xs text-[#696868] font-bold uppercase">Bekleyen</p>
+                        <p class="text-3xl font-bold mt-1 text-[#685d4a]" id="stat-pending">-</p>
+                    </div>
+                    <div class="glass-panel p-4 rounded-xl text-center shadow-sm">
+                        <p class="text-xs text-[#696868] font-bold uppercase">İşlenmiş</p>
+                        <p class="text-3xl font-bold mt-1 text-[#685d4a]" id="stat-processed">-</p>
+                    </div>
+                </div>
+
+                <!-- Guest Link Panel -->
+                <div class="glass-panel p-6 rounded-2xl mb-8 flex flex-col md:flex-row items-center justify-between gap-4">
+                    <div class="flex-1 w-full">
+                        <h3 class="text-sm font-bold flex items-center gap-2 mb-2">
+                            <span class="material-symbols-outlined text-[#685d4a]">link</span> 
+                            Misafir Paylaşım Linki
+                        </h3>
+                        <div class="flex bg-white border border-[#e2e2e2] rounded-lg overflow-hidden">
+                            <input type="text" id="guest-link-input" class="w-full px-4 py-2 text-sm text-[#4b463d] bg-transparent outline-none" readonly>
+                            <button onclick="copyGuestLink()" class="px-4 py-2 bg-[#f3f3f4] hover:bg-[#e8e8e8] text-[#1a1c1c] font-medium text-sm transition-colors border-l border-[#e2e2e2]">Kopyala</button>
+                        </div>
+                    </div>
+                    <a id="guest-link-btn" href="#" target="_blank" class="shrink-0 h-10 px-6 rounded-lg bg-white border border-[#cec5ba] flex items-center gap-2 text-sm font-medium hover:bg-[#f9f9f9] transition-colors whitespace-nowrap">
+                        <span class="material-symbols-outlined text-[18px]">open_in_new</span>
+                        Linki Aç
+                    </a>
+                </div>
+
+                <!-- Upload Panel -->
+                <div class="bg-white rounded-3xl p-8 shadow-sm border border-[#e2e2e2]">
+                    <h3 class="text-lg font-bold flex items-center gap-2 mb-6">
+                        <span class="material-symbols-outlined text-[#685d4a]">cloud_upload</span> 
+                        Fotoğraf Yükle
+                    </h3>
+                    
+                    <div class="border-2 border-dashed border-[#cec5ba] rounded-2xl p-8 text-center hover:border-[#685d4a] hover:bg-[#f0e0c8]/20 transition-all cursor-pointer relative" id="drop-zone" onclick="document.getElementById('file-upload').click()">
+                        <input type="file" id="file-upload" class="hidden" multiple accept="image/jpeg, image/png, image/jpg" onchange="handleFileSelect(event)">
+                        <div class="w-16 h-16 rounded-full bg-[#f0e0c8] text-[#685d4a] mx-auto flex items-center justify-center mb-4">
+                            <span class="material-symbols-outlined text-3xl">add_photo_alternate</span>
+                        </div>
+                        <p class="font-medium text-[#1a1c1c]">Fotoğrafları seçmek için tıklayın</p>
+                        <p class="text-sm text-[#696868] mt-1">.jpg, .jpeg, .png</p>
+                        <p class="text-xs text-[#685d4a] font-bold mt-2" id="selected-files-count"></p>
+                    </div>
+
+                    <div id="upload-progress-container" class="hidden mt-6">
+                        <div class="flex justify-between text-sm mb-2 font-medium">
+                            <span id="upload-status-text">Yükleniyor...</span>
+                            <span id="upload-percentage">0%</span>
+                        </div>
+                        <div class="w-full bg-[#eeeeee] rounded-full h-2.5 overflow-hidden">
+                            <div id="upload-progress-bar" class="bg-[#685d4a] h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 flex justify-end gap-3">
+                        <button id="btn-upload" class="btn-primary py-3 px-6 rounded-xl font-medium hidden" onclick="startUpload()">
+                            Yüklemeyi Başlat
+                        </button>
+                    </div>
+
+                    <div id="ai-processing-alert" class="hidden mt-6 p-4 bg-[#e8f5e9] border border-[#c8e6c9] rounded-xl text-[#2e7d32] flex items-start gap-3">
+                        <span class="material-symbols-outlined animate-pulse">psychology</span>
+                        <div>
+                            <h4 class="font-bold text-sm">Yapay Zeka Analizi Başladı</h4>
+                            <p class="text-xs mt-1">Fotoğraflar yüklendi. Arka planda yüz tanıma ve kümeleme işlemi devam ediyor. Misafirleriniz birkaç dakika içinde sonuçları görebilir.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Event Modal -->
+    <div id="new-event-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="toggleNewEventModal(false)"></div>
+        <div class="bg-white rounded-3xl p-8 w-full max-w-md relative z-10 shadow-2xl animate-fade-in-up">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold">Yeni Etkinlik</h2>
+                <button onclick="toggleNewEventModal(false)" class="text-[#696868] hover:text-[#1a1c1c]"><span class="material-symbols-outlined">close</span></button>
+            </div>
+            <form onsubmit="handleCreateEvent(event)" class="flex flex-col gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-[#4b463d] mb-1">Etkinlik Adı</label>
+                    <input type="text" id="new-event-title" class="input-field" placeholder="Ayşe & Ahmet Düğünü" required>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-[#4b463d] mb-1">Tarih</label>
+                    <input type="date" id="new-event-date" class="input-field" required>
+                </div>
+                <button type="submit" class="btn-primary w-full py-3 rounded-xl font-medium mt-4 flex items-center justify-center gap-2">
+                    <span id="create-event-spinner" class="spinner hidden"></span>
+                    Oluştur
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script src="/config.js"></script>
+    <script src="/studio.js"></script>
+    <style>
+        .animate-fade-in-up { animation: fadeInUp 0.3s ease-out forwards; }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</body>
+</html>
