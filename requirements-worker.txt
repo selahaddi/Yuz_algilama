@@ -1,8 +1,0 @@
-insightface
-onnxruntime
-opencv-python-headless
-scikit-learn
-numpy
-supabase
-requests
-python-dotenv

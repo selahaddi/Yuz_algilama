@@ -1,10 +1,10 @@
 # Project-Scoped Rules for AI Agents
 
 ## 1. Mimari Prensipler (Architecture Principles)
-- **Frontend Kesinlikle Streamlit Değildir:** Eski prototipten kalma `app.py` veya `studio_app.py` dosyaları artık canlı web sitesini temsil YETMEZ. Her türlü arayüz ve frontend işlemi **sadece `public/` dizini içindeki (HTML/JS/CSS)** dosyalara yapılmalıdır. Vercel üzerinden bu klasör hizmet vermektedir.
+- **Frontend sadece `public/` dizinindedir.** Tüm arayüz (HTML/JS/CSS) dosyaları `public/` klasöründe bulunur. Vercel üzerinden bu klasör hizmet vermektedir. Projede Streamlit **yoktur ve kullanılmaz**.
 - **Backend Kesinlikle Cloud Run (FastAPI):** Projede arka uç olarak çalışan sistem `guest_api.py` adlı FastAPI uygulamasıdır. Backend güncellemeleri yapıldığında Google Cloud Run `guest-api` servisi yeniden derlenmelidir (Build & Deploy).
 - **Yüz Tanıma (AI Worker):** AI işlemleri `worker.py` içinde InsightFace `buffalo_s` kullanılarak asenkron `ThreadPoolExecutor` ile yapılır. Bu servis Cloud Run Jobs üzerinde `face-worker-job` adıyla çalışır.
-- **Vercel Konfigürasyonu:** `vercel.json` dosyası kök dizinde kalmalıdır ve sadece Vercel yönlendirmelerini (API rewrites) içermelidir. Vercel Root Directory ayarı kullanılmamaktadır, output doğrudan public'e eşlenmiştir.
+- **Vercel Konfigürasyonu:** `vercel.json` dosyası `public/` dizininde bulunur ve sadece Vercel yönlendirmelerini (API rewrites) içerir. Vercel Root Directory ayarı `public/` olarak yapılandırılmıştır.
 
 ## 2. Maliyet ve Optimizasyon Kuralları (Cost Optimization)
 - Yüz tanıma işlemi (storage'a yazma süreci) öncesinde `public/studio.js` içinde `resizeImage` canvas fonksiyonu mevcuttur. Storage maliyetini önlemek için asla yüksek çözünürlüklü fotoğraflar doğrudan Supabase'e kaydedilmemelidir, tarayıcıda küçültülmelidir.
@@ -13,3 +13,10 @@
 ## 3. Kod ve Deployment Akışı
 - Frontend (Vercel) değişikliği için: Localde düzenle -> `git add` -> `git commit` -> `git push origin master`.
 - Backend (Cloud Run) değişikliği için: Localde düzenle -> `gcloud builds submit` -> `gcloud run deploy guest-api`.
+
+## 4. Yapay Zeka (AI) ve Yüz Tanıma Parametreleri
+- **Eşik Değerleri (Thresholds):** Sistemdeki yüz tanıma doğruluğunu artırmak ve uzaktaki küçük yüzleri tespit edebilmek için sabit değerler şu şekildedir:
+  - `MIN_FACE_SIZE = 50` (Piksel cinsinden minimum yüz boyutu)
+  - `MIN_DET_SCORE = 0.70` (Minimum yüz tespit doğruluk skoru)
+  - `MIN_BLUR_SCORE = 15.00` (Minimum bulanıklık eşiği)
+- Bu değerler `worker.py` ve `tests/test_app.py` içinde standart olarak korunmalıdır.

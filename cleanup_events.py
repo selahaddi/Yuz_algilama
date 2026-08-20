@@ -1,5 +1,6 @@
 import os
 import datetime
+from urllib.parse import urlparse
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
@@ -45,11 +46,12 @@ def main():
         files_to_delete = []
         for p in photos:
             if p.get("image_url"):
-                file_name = p["image_url"].split("/")[-1]
+                parsed = urlparse(p["image_url"])
+                file_name = parsed.path.split("/")[-1]
                 files_to_delete.append(file_name)
             if p.get("thumbnail_url"):
-                thumb_name = p["thumbnail_url"].split("/")[-1]
-                # thumbnail_url contains 'thumbnails/' in the URL but maybe we just extract the name
+                parsed = urlparse(p["thumbnail_url"])
+                thumb_name = parsed.path.split("/")[-1]
                 files_to_delete.append(f"thumbnails/{thumb_name}")
                 
         # 2. Storage'dan dosyaları sil (batch)

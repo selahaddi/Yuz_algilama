@@ -33,6 +33,7 @@ Proje mimarisi frontend, backend ve yapay zeka worker'ı olmak üzere üçe ayr�
 - **Konum:** `worker.py`, `core/face_analyzer.py`
 - **Teknoloji:** Python, InsightFace (`buffalo_s`), Scikit-Learn (DBSCAN).
 - **İşlev:** Stüdyo yeni fotoğraflar yüklediğinde arka planda tetiklenir. Yüzleri bulur, vektörleştirir ve gruplar. İşlemleri `ThreadPoolExecutor` ile asenkron yürütür.
+- **Yüz Tanıma Eşikleri:** Uzaktaki/küçük yüzlerin tespiti için `MIN_FACE_SIZE = 50`, `MIN_DET_SCORE = 0.70`, `MIN_BLUR_SCORE = 15.00` olarak optimize edilmiştir.
 
 ---
 
