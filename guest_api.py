@@ -17,12 +17,13 @@ from collections import OrderedDict
 # Ortam değişkenlerini yükle
 load_dotenv()
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
-SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", os.environ.get("SUPABASE_KEY", ""))
+# Cloud Run arka plan servisi olduğu için yetkili (service role) anahtarını kullanmalı
+SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", os.environ.get("SUPABASE_KEY", os.environ.get("SUPABASE_ANON_KEY", "")))
 
-if not SUPABASE_URL or not SUPABASE_ANON_KEY:
-    raise RuntimeError("SUPABASE_URL ve SUPABASE_ANON_KEY .env dosyasında bulunamadı.")
+if not SUPABASE_URL or not SUPABASE_KEY:
+    raise RuntimeError("SUPABASE_URL ve SUPABASE_KEY .env dosyasında bulunamadı.")
 
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 from fastapi.middleware.cors import CORSMiddleware
 
