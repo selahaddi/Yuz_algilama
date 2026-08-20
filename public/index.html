@@ -3,8 +3,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&amp;family=Playfair+Display:wght@100..900&amp;display=swap" rel="stylesheet"></head><body class="bg-background font-body-md text-on-background"><header class="fixed top-0 w-full z-50 bg-surface/60 backdrop-blur-xl border-b border-white/20 shadow-[0_4px_20px_rgba(51,51,51,0.05)]"><div class="h-20 max-w-[1280px] mx-auto px-margin-mobile lg:px-margin-desktop flex items-center justify-between"><div class="flex flex-col"><span class="font-headline-md text-headline-md-mobile lg:text-headline-md text-primary tracking-tight leading-none">Ayşe &amp; Ahmet</span><span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest mt-1">24 Ekim 2024</span></div></div></header><main class="w-full pt-20 pb-xl bg-background"><div class="flex flex-col w-full px-margin-mobile lg:px-margin-desktop gap-xl">
 <div class="w-full max-w-[800px] mx-auto flex p-1 bg-surface-container-high rounded-full shadow-inner relative" id="tab-group">
 <div class="absolute inset-y-1 w-[calc(50%-4px)] bg-surface rounded-full shadow-md transition-transform duration-300 ease-out z-0" id="tab-indicator" style="transform: translateX(100%);"></div>
-<button class="flex-1 py-3 text-center rounded-full font-title-lg text-title-lg relative z-10 transition-colors text-on-surface-variant" onclick="switchTab(0, this)">Selfie ile Bul</button>
-<button class="flex-1 py-3 text-center rounded-full font-title-lg text-title-lg hover:text-primary relative z-10 transition-colors text-primary" onclick="switchTab(1, this)">Kişiye Göre Gözat</button>
+<button class="flex-1 py-3 text-center rounded-full font-label-md md:font-title-lg text-sm md:text-title-lg relative z-10 transition-colors text-on-surface-variant" onclick="switchTab(0, this)">Selfie ile Bul</button>
+<button class="flex-1 py-3 text-center rounded-full font-label-md md:font-title-lg text-sm md:text-title-lg hover:text-primary relative z-10 transition-colors text-primary" onclick="switchTab(1, this)">Kişiye Göre Gözat</button>
 </div>
 <div class="w-full flex-col gap-lg animate-fade-in hidden" id="tab-selfie">
 <div class="text-center max-w-2xl mx-auto flex flex-col gap-sm">
@@ -67,7 +67,8 @@
   <!-- Dinamik olarak JS ile doldurulacak -->
 </div>
   <input type="hidden" id="person-select-hidden" value="">
-<button class="w-full py-4 rounded-xl bg-primary text-on-primary font-title-lg text-title-lg shadow-lg hover:shadow-xl hover:bg-surface-tint transition-all disabled:opacity-50 disabled:cursor-not-allowed" disabled="" id="fetch-photos-btn" onclick="const select = { value: document.getElementById('person-select-hidden').value, options: [{text: 'Seçilen Kişi'}], selectedIndex: 0 }; fetchPersonPhotos(select)">
+  <input type="hidden" id="person-name-hidden" value="">
+<button class="w-full py-4 rounded-xl bg-primary text-on-primary font-title-lg text-title-lg shadow-lg hover:shadow-xl hover:bg-surface-tint transition-all disabled:opacity-50 disabled:cursor-not-allowed" disabled="" id="fetch-photos-btn" onclick="fetchPersonPhotos()">
               Fotoğrafları Getir
           </button>
 </div>
@@ -80,6 +81,7 @@
 </div>
 </div>
 </div>
+<script src="/config.js"></script>
 <script>
     const urlParams = new URLSearchParams(window.location.search);
     const eventId = urlParams.get('event_id');
@@ -91,7 +93,7 @@
     }
 
     // Load Event Details
-    fetch('/api/event/' + eventId, {
+    fetch(GUEST_API_URL + '/api/event/' + eventId, {
         headers: {
             'Bypass-Tunnel-Reminder': 'true'
         }
@@ -111,7 +113,7 @@
         });
 
     // Load Clusters
-    fetch('/api/clusters/' + eventId, {
+    fetch(GUEST_API_URL + '/api/clusters/' + eventId, {
         headers: {
             'Bypass-Tunnel-Reminder': 'true'
         }
@@ -120,18 +122,20 @@
         .then(data => {
             const grid = document.getElementById('clusters-grid');
             let html = '';
+            if (data.clusters.length === 0) {
+                html = '<p class="col-span-full text-center font-body-md text-on-surface-variant">Henüz işlenmiş yüz bulunamadı. Fotoğraflar işlendikten sonra burada kişiler görünecek.</p>';
+            }
             data.clusters.forEach(c => {
-                const avatarUrl = `/api/avatar/${c.id}`;
+                const avatarUrl = `${GUEST_API_URL}/api/avatar/${c.id}?event_id=${eventId}`;
+                const countLabel = c.photo_count ? `(${c.photo_count})` : '';
                 html += `
                 <div class="flex flex-col items-center gap-2 cursor-pointer group/avatar" onclick="selectPerson(${c.id}, '${c.name}', this)">
                   <div class="avatar-ring w-16 h-16 rounded-full border-2 border-transparent p-1 transition-all group-hover/avatar:border-primary/50 relative overflow-hidden flex items-center justify-center bg-surface-variant">
                     <img src="${avatarUrl}" class="w-full h-full rounded-full object-cover transition-opacity duration-300" alt="${c.name}" onerror="this.src='https://via.placeholder.com/150'">
                   </div>
-                  <span class="font-label-sm text-label-sm text-on-surface-variant group-hover/avatar:text-primary transition-colors">${c.name}</span>
+                  <span class="font-label-sm text-label-sm text-on-surface-variant group-hover/avatar:text-primary transition-colors">${c.name} ${countLabel}</span>
                 </div>`;
             });
-            html += `<input type="hidden" id="person-select-hidden" value="">`;
-            html += `<input type="hidden" id="person-name-hidden" value="">`;
             grid.innerHTML = html;
         });
 
@@ -279,7 +283,7 @@
         overlay.classList.remove('hidden');
         overlay.classList.add('flex');
         
-        fetch('/api/search_selfie', {
+        fetch(GUEST_API_URL + '/api/search_selfie', {
             method: 'POST',
             body: formData,
             headers: {
@@ -316,7 +320,7 @@
         
         btn.innerHTML = '<span class="material-symbols-outlined animate-spin">refresh</span> Yükleniyor...';
         
-        fetch('/api/cluster_photos/' + clusterId, {
+        fetch(GUEST_API_URL + '/api/cluster_photos/' + clusterId + '?event_id=' + eventId, {
             headers: {
                 'Bypass-Tunnel-Reminder': 'true'
             }
@@ -327,7 +331,11 @@
             title.innerText = `${personName} Fotoğrafları`;
             results.classList.remove('hidden');
             
-            populateGrid('browse-grid', data.photos);
+            if (data.photos.length === 0) {
+                document.getElementById('browse-grid').innerHTML = '<p class="col-span-full text-center font-body-md text-on-surface-variant py-8">Bu kişiye ait fotoğraf bulunamadı.</p>';
+            } else {
+                populateGrid('browse-grid', data.photos);
+            }
             results.scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
     }

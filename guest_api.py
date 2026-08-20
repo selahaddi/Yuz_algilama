@@ -1,16 +1,18 @@
 import os
 import cv2
 import numpy as np
-from fastapi import FastAPI, UploadFile, File, HTTPException, Form
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form, Query
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from supabase import create_client, Client
 from dotenv import load_dotenv
-from core.face_analyzer import FaceAnalyzer
 import json
 import requests
 import io
+import threading
+from functools import lru_cache
+from collections import OrderedDict
 
 # Ortam değişkenlerini yükle
 load_dotenv()
@@ -22,10 +24,55 @@ if not SUPABASE_URL or not SUPABASE_ANON_KEY:
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
 
+from fastapi.middleware.cors import CORSMiddleware
+
 app = FastAPI(title="Yüz Tanıma SaaS - Guest API")
 
-# Hızlı Yüz Analiz Modeli (CPU/GPU)
-analyzer = FaceAnalyzer(gpu_id=0)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Geliştirme/Vercel için herkese açık
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ─── Lazy Model Loading ───────────────────────────────────────────────────────
+# InsightFace modeli (~600MB RAM) yalnızca selfie araması yapıldığında yüklenir.
+# Bu sayede Cloud Run container'ı daha hızlı başlar ve az RAM kullanır.
+_analyzer = None
+_analyzer_lock = threading.Lock()
+
+def get_analyzer():
+    global _analyzer
+    if _analyzer is None:
+        with _analyzer_lock:
+            if _analyzer is None:
+                from core.face_analyzer import FaceAnalyzer
+                _analyzer = FaceAnalyzer(gpu_id=0)
+    return _analyzer
+
+# ─── Avatar Cache (LRU, Max 200 entry) ────────────────────────────────────────
+# Bellek taşmasını önlemek için maksimum 200 avatar cache'lenir.
+class LRUAvatarCache:
+    def __init__(self, maxsize=200):
+        self.cache = OrderedDict()
+        self.maxsize = maxsize
+
+    def get(self, key):
+        if key in self.cache:
+            self.cache.move_to_end(key)
+            return self.cache[key]
+        return None
+
+    def set(self, key, value):
+        if key in self.cache:
+            self.cache.move_to_end(key)
+        self.cache[key] = value
+        if len(self.cache) > self.maxsize:
+            self.cache.popitem(last=False)
+
+avatar_cache = LRUAvatarCache(maxsize=200)
+
 
 @app.get("/api/event/{event_id}")
 def get_event(event_id: str):
@@ -34,8 +81,12 @@ def get_event(event_id: str):
         raise HTTPException(status_code=404, detail="Etkinlik bulunamadı")
     return res.data[0]
 
+
 @app.post("/api/search_selfie")
 async def search_selfie(event_id: str = Form(...), file: UploadFile = File(...)):
+    # Model yalnızca bu endpoint çağrıldığında yüklenir (Lazy Loading)
+    analyzer = get_analyzer()
+
     contents = await file.read()
     nparr = np.frombuffer(contents, np.uint8)
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
@@ -66,9 +117,10 @@ async def search_selfie(event_id: str = Form(...), file: UploadFile = File(...))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.get("/api/clusters/{event_id}")
 def get_clusters(event_id: str):
-    # Bu etkinlikteki benzersiz cluster_id'leri bul ve her biri için örnek bir fotoğraf getir
+    """Bu etkinlikteki benzersiz cluster_id'leri bul ve her biri için fotoğraf sayısını döndür."""
     res = supabase.table("faces") \
         .select("cluster_id, bbox, photos!inner(event_id, thumbnail_url, image_url)") \
         .eq("photos.event_id", event_id) \
@@ -78,7 +130,7 @@ def get_clusters(event_id: str):
     if not res.data:
         return {"clusters": []}
         
-    # Cluster'ları grupla ve her biri için ilk fotoğrafı avatar yap
+    # Cluster'ları grupla ve her biri için fotoğraf sayısını hesapla
     clusters_dict = {}
     for row in res.data:
         cid = row.get("cluster_id")
@@ -87,29 +139,51 @@ def get_clusters(event_id: str):
         if cid not in clusters_dict:
             clusters_dict[cid] = {
                 "id": cid,
-                "name": f"Kişi #{cid}"
+                "name": f"Kişi #{cid}",
+                "photo_count": 0,
+                "photo_ids": set()
             }
-            
-    # id'ye göre sırala
-    sorted_clusters = sorted(list(clusters_dict.values()), key=lambda x: x["id"])
+        # Benzersiz fotoğraf sayısını hesapla (aynı fotoğraftaki birden fazla yüz sayılmasın)
+        photo_info = row.get("photos", {})
+        if photo_info and photo_info.get("image_url"):
+            clusters_dict[cid]["photo_ids"].add(photo_info["image_url"])
+    
+    # photo_ids set'ini temizle (JSON serializable değil) ve sayıya çevir
+    sorted_clusters = []
+    for cid in sorted(clusters_dict.keys()):
+        cluster = clusters_dict[cid]
+        sorted_clusters.append({
+            "id": cluster["id"],
+            "name": cluster["name"],
+            "photo_count": len(cluster["photo_ids"])
+        })
+    
     return {"clusters": sorted_clusters}
 
-avatar_cache = {}
 
 @app.get("/api/avatar/{cluster_id}")
-def get_avatar(cluster_id: int):
-    if cluster_id in avatar_cache:
+def get_avatar(cluster_id: int, event_id: str = Query(None)):
+    """Cluster avatar'ını döndür. event_id verilmişse sadece o etkinlikteki yüzlerden avatar oluşturur."""
+    cache_key = f"{event_id or 'global'}_{cluster_id}"
+
+    cached = avatar_cache.get(cache_key)
+    if cached:
         return StreamingResponse(
-            io.BytesIO(avatar_cache[cluster_id]), 
+            io.BytesIO(cached), 
             media_type="image/jpeg", 
             headers={"Cache-Control": "public, max-age=86400"}
         )
-        
-    res = supabase.table("faces") \
-        .select("bbox, photos!inner(image_url)") \
-        .eq("cluster_id", cluster_id) \
-        .limit(1) \
-        .execute()
+
+    # Sorguyu oluştur
+    query = supabase.table("faces") \
+        .select("bbox, photos!inner(image_url, event_id)") \
+        .eq("cluster_id", cluster_id)
+
+    # event_id filtresi varsa ekle
+    if event_id:
+        query = query.eq("photos.event_id", event_id)
+
+    res = query.limit(1).execute()
         
     if not res.data:
         raise HTTPException(status_code=404, detail="Not found")
@@ -147,7 +221,7 @@ def get_avatar(cluster_id: int):
         _, buffer = cv2.imencode('.jpg', face_crop, [int(cv2.IMWRITE_JPEG_QUALITY), 85])
         jpeg_bytes = buffer.tobytes()
         
-        avatar_cache[cluster_id] = jpeg_bytes
+        avatar_cache.set(cache_key, jpeg_bytes)
         return StreamingResponse(
             io.BytesIO(jpeg_bytes), 
             media_type="image/jpeg", 
@@ -156,12 +230,22 @@ def get_avatar(cluster_id: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.get("/api/cluster_photos/{cluster_id}")
-def get_cluster_photos(cluster_id: int):
-    res = supabase.table("faces") \
-        .select("photos(image_url, thumbnail_url)") \
-        .eq("cluster_id", cluster_id) \
-        .execute()
+def get_cluster_photos(cluster_id: int, event_id: str = Query(None)):
+    """
+    Belirli bir cluster'a ait fotoğrafları döndür.
+    event_id verilmişse, yalnızca o etkinlikteki fotoğrafları filtreler.
+    """
+    query = supabase.table("faces") \
+        .select("photos!inner(image_url, thumbnail_url, event_id)") \
+        .eq("cluster_id", cluster_id)
+
+    # event_id filtresi varsa ekle (güvenlik: başka etkinliklerin fotoğrafları karışmasın)
+    if event_id:
+        query = query.eq("photos.event_id", event_id)
+
+    res = query.execute()
         
     if not res.data:
         return {"photos": []}
@@ -170,9 +254,55 @@ def get_cluster_photos(cluster_id: int):
     for row in res.data:
         p = row.get("photos")
         if p:
-            unique_photos[p["image_url"]] = p
+            unique_photos[p["image_url"]] = {
+                "image_url": p["image_url"],
+                "thumbnail_url": p.get("thumbnail_url")
+            }
             
     return {"photos": list(unique_photos.values())}
+
+
+@app.post("/api/trigger_worker")
+def trigger_worker():
+    """
+    Cloud Run Worker Job'ı tetikler.
+    Studio App fotoğraf yüklemesi tamamlandığında bu endpoint çağrılır.
+    """
+    project_id = os.environ.get("GCP_PROJECT_ID", "yuz-tanima-app-9947")
+    region = os.environ.get("GCP_REGION", "europe-west1")
+    job_name = "face-worker-job"
+
+    # Google Cloud Run Jobs Admin API v2 — doğru URL formatı
+    url = f"https://run.googleapis.com/v2/projects/{project_id}/locations/{region}/jobs/{job_name}:run"
+
+    try:
+        # Cloud Run içinden metadata server üzerinden access token al
+        # NOT: Doğru path /token'dır, /access_token değil!
+        token_url = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token"
+        token_res = requests.get(token_url, headers={"Metadata-Flavor": "Google"}, timeout=5)
+        token_res.raise_for_status()
+        access_token = token_res.json()["access_token"]
+
+        # Worker Job'ı tetikle
+        run_res = requests.post(
+            url,
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json"
+            },
+            json={},
+            timeout=30
+        )
+        run_res.raise_for_status()
+        return {"status": "ok", "message": "Worker Job tetiklendi."}
+
+    except requests.exceptions.ConnectionError:
+        # Yerel geliştirme ortamında metadata server erişilemez — sessizce geç
+        return {"status": "skipped", "message": "Yerel ortamda çalışıyor, Cloud Run Job tetiklenemedi."}
+    except Exception as e:
+        # Tetikleme başarısız olsa bile fotoğraflar yüklendi, kritik bir hata değil
+        return {"status": "error", "message": f"Worker tetiklenemedi: {str(e)}"}
+
 
 # Statik frontend dosyalarını servis et (HTML/CSS/JS)
 app.mount("/", StaticFiles(directory="public", html=True), name="public")

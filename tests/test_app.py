@@ -3,6 +3,8 @@ import os
 import cv2
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
+import sys, os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from core.face_analyzer import FaceAnalyzer
 
 st.set_page_config(page_title="Yüz Filtre Test Aracı", layout="wide", page_icon="🧪")

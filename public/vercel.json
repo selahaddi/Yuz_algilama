@@ -1,8 +1,6 @@
 {
+  "cleanUrls": true,
   "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "https://real-plums-push.loca.lt/api/$1"
-    }
+    { "source": "/api/:path*", "destination": "https://guest-api-398389727192.europe-west1.run.app/api/:path*" }
   ]
 }

@@ -7,7 +7,7 @@ ENV TZ=Etc/UTC
 # Install system dependencies required for OpenCV and building packages
 RUN apt-get update && apt-get install -y \
     build-essential \
-    libgl1-mesa-glx \
+    libgl1 \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
@@ -27,8 +27,11 @@ WORKDIR $HOME/app
 # Copy the current directory contents into the container at $HOME/app setting the owner to the user
 COPY --chown=user . $HOME/app
 
-# Install worker requirements
-RUN pip install --no-cache-dir -r requirements-worker.txt
+# Install all requirements
+RUN pip install --no-cache-dir -r requirements-all.txt
+
+# Download AI models to bake them into the Docker image
+RUN python download_models.py
 
 # Run the worker script
 CMD ["python", "worker.py"]

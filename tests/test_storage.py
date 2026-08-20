@@ -2,7 +2,7 @@ import sys
 import os
 
 from dotenv import load_dotenv
-load_dotenv("../Yüz_Tanıma_&_Kategori/.env")
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"))
 
 from supabase import create_client
 url = os.environ.get("SUPABASE_URL")
