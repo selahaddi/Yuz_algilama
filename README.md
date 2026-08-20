@@ -1,63 +1,62 @@
-# 👥 Yüz Tanıma ve Kategorizasyon Sistemi
+# 👥 Yüz Tanıma SaaS - Fotoğraf Stüdyosu Yönetim Sistemi
 
-Bu proje, sisteme yüklenen fotoğraflardaki yüzleri tespit eden ve kimliklerinin önceden sisteme tanıtılmasına (veri girişi yapılmasına) gerek kalmadan, tamamen yüz özelliklerinin benzerliğine göre kişileri otomatik olarak gruplandıran yapay zeka tabanlı bir Streamlit web uygulamasıdır.
+Bu proje, düğün ve etkinlik fotoğrafçıları için geliştirilmiş, yapay zeka tabanlı bir yüz tanıma ve fotoğraf dağıtım SaaS (Software as a Service) uygulamasıdır.
+
+Sistem, yüklenen fotoğraflardaki yüzleri tespit eder, benzerliklerine göre otomatik kümelendirir ve stüdyoların yüzlerce etkinlik fotoğrafını misafirlerin kendi yüzlerini bularak saniyeler içinde alabilmesini sağlar.
 
 ## 🌟 Öne Çıkan Özellikler
 
-- **Gözetimsiz Öğrenme ile Gruplandırma:** Sistem, veri tabanına kayıtlı yüzlere ihtiyaç duymaz. Resimdeki tüm yüzleri tarar, her birinin haritasını (embedding) çıkarır ve benzer olanları "Kişi 1", "Kişi 2" şeklinde otomatik olarak kümeler.
-- **Ekran Kartı (GPU) Hızlandırması:** Ağır yapay zeka işlemlerinin milisaniyeler içerisinde gerçekleşmesi için NVIDIA GTX 1650 Ti GPU desteği (CUDA & ONNXRuntime) entegre edilmiştir.
-- **Hassasiyet Ayarı (Confidence Threshold):** Yanlış tespitleri ve düşük çözünürlüklü/bozuk yüzlerin analize dahil olmasını engellemek için sol menüden ayarlanabilen dinamik bir yüz tespit doğruluk sınırı filtresi bulunur. Yüzler ekrana basılırken altlarında tespit doğruluk oranları (Örn: `%98.5`) yer alır.
-- **Kullanıcı Dostu Web Arayüzü:** Çoklu dosya seçimi, modern tasarım, yükleme animasyonları ve şık bir ızgara (grid) görünümü sunan Streamlit altyapısı.
-- **Tak & Çalıştır Script:** Bağımlılıkların ve Python sanal ortamının (venv) otomatik kurulumunu üstlenen hazır bir Bash scripti (`baslat.sh`) içerir.
+- **Gözetimsiz Öğrenme (DBSCAN) ve AI:** InsightFace (`buffalo_s`) modeli ile veri tabanına önceden kayıtlı yüze ihtiyaç duymadan yüz haritası çıkarımı.
+- **Bulut Mimarisi & Paralel İşleme:** Google Cloud Run üzerinde çalışan `FastAPI` (Guest API) ve arka planda `worker.py` (Cloud Run Job) ile 4'erli paralel işleme mimarisi (ThreadPool).
+- **İstemci Taraflı Optimizasyon:** HTML Canvas ile yüklenen fotoğraflar Vercel frontend tarafında tarayıcıda 1920px (FHD) boyutuna sıkıştırılır; Storage maliyetlerinden %90 tasarruf sağlanır.
+- **Gerçek Zamanlı Veritabanı:** Supabase PostgreSQL ve Storage ile anlık etkinlik/fotoğraf yönetimi.
+- **Otomatik Temizlik (Cost Saver):** `cleanup_events.py` scripti sayesinde 30 günü geçen eski etkinlikler Cloud Storage ve veritabanından otomatik silinir.
 
 ---
 
-## 🛠️ Kullanılan Teknolojiler
+## 🛠️ Mimari ve Kullanılan Teknolojiler
 
-- **[InsightFace](https://github.com/deepinsight/insightface):** Derin öğrenme tabanlı, state-of-the-art 2D ve 3D yüz analiz kütüphanesi. Projede, yüz tespiti ve 512 boyutlu özellik vektörü (embedding) çıkarımı için varsayılan ve en yetenekli modeli olan `buffalo_l` kullanılmaktadır.
-- **ONNXRuntime-GPU:** InsightFace modelinin NVIDIA CUDA çekirdekleri üzerinde yüksek performansla çalışmasını sağlayan inference (çıkarım) motoru.
-- **Scikit-Learn (DBSCAN):** Yoğunluk tabanlı mekansal kümeleme algoritması. Yüzlerin birbirinden ne kadar uzak/yakın olduğunu "Kosinüs Uzaklığı (Cosine Distance)" metriği ile hesaplayarak, kaç farklı kişi olduğunu baştan bilmeye gerek duymadan dinamik gruplama (clustering) yapar.
-- **Streamlit:** Python kodlarını hızlı ve interaktif web uygulamalarına dönüştüren açık kaynaklı UI kütüphanesi.
-- **OpenCV & NumPy:** Görüntü matrislerinin (RGB/BGR) okunması, yüzlerin kırpılması ve matematiksel vektör işlemleri için.
+Proje mimarisi frontend, backend ve yapay zeka worker'ı olmak üzere üçe ayrılmıştır. Lütfen eski Streamlit altyapısını dikkate almayın.
 
----
+### 1. Frontend (Vercel)
+- **Konum:** `public/` dizini.
+- **Teknoloji:** Saf HTML, JS, CSS ve Supabase JS SDK.
+- **Önemli Dosyalar:** `index.html` (Misafir yüz arama), `studio.html` (Fotoğrafçı paneli).
+- **Yayınlama:** Vercel üzerinden GitHub bağlantılı olarak yayınlanır. `vercel.json` dosyasındaki kurallarla API çağrıları Google Cloud'a (`guest-api`) yönlendirilir.
 
-## 📂 Proje Dosya Yapısı ve Mimari İşleyiş
+### 2. Backend API (Google Cloud Run)
+- **Konum:** `guest_api.py` (Kök dizin).
+- **Teknoloji:** Python, FastAPI, Supabase Python Client.
+- **İşlev:** Misafirlerin "Benim yüzümü bul" isteklerini alır, referans resimden embedding çıkarır ve veritabanındaki yüzleri kosinüs benzerliğine göre eşleştirir.
 
-```text
-Yüz_Tanıma_&_Kategori/
-├── core/
-│   ├── face_analyzer.py   # InsightFace ile yüzleri bulan ve özelliklerini çıkaran modül
-│   └── clusterer.py       # Scikit-learn DBSCAN ile yüzleri benzerliğe göre gruplayan modül
-├── app.py                 # Streamlit web arayüzü ve uygulamanın ana akış kontrolörü
-├── baslat.sh              # venv oluşturan, gereksinimleri kuran ve app.py'yi başlatan script
-└── requirements.txt       # Projenin çalışması için gereken Python kütüphanelerinin listesi
-```
-
-### Akış Senaryosu (Pipeline)
-
-1. **Giriş:** Kullanıcı web arayüzü üzerinden bir veya birden fazla resim dosyası seçer.
-2. **Yüz Tespiti (Detection):** `FaceAnalyzer`, her bir resmi okur. Resimdeki yüzlerin koordinatlarını (Bounding Box) ve doğruluk puanını (Det Score) çıkarır.
-3. **Filtreleme:** Ayarlanan "Yüz Tespit Doğruluk Sınırı" (örn: %50) altında kalan yüzler, gürültü/hata varsayılarak elenir.
-4. **Özellik Çıkarımı (Embedding):** Kalan her bir geçerli yüz için 512 boyutlu sayısal bir "kimlik dizisi (embedding)" oluşturulur ve yüz resimden kırpılarak belleğe alınır.
-5. **Kümeleme (Clustering):** Toplanan tüm yüz kimlik dizileri (embeddings) `FaceClusterer` modülüne yollanır. DBSCAN algoritması, bu vektörler arasındaki açısal farkları (kosinüs benzerliği) ölçer. Birbirine yakın olan vektörler aynı "Kişi" ID'sini (etiketini) alır. Birbirine hiç benzemeyen veya çok uzak kalan vektörler "Gürültü (-1)" olarak etiketlenir.
-6. **Çıkış:** `app.py`, dönen etiketleri işleyerek aynı ID'ye sahip kırpılmış yüz görsellerini arayüzde alt alta, gruplar halinde ekrana basar.
+### 3. AI Worker Job (Google Cloud Run Jobs)
+- **Konum:** `worker.py`, `core/face_analyzer.py`
+- **Teknoloji:** Python, InsightFace (`buffalo_s`), Scikit-Learn (DBSCAN).
+- **İşlev:** Stüdyo yeni fotoğraflar yüklediğinde arka planda tetiklenir. Yüzleri bulur, vektörleştirir ve gruplar. İşlemleri `ThreadPoolExecutor` ile asenkron yürütür.
 
 ---
 
-## 🚀 Kurulum ve Çalıştırma
+## 🚀 Dağıtım (Deployment) Bilgileri
 
-Proje dosyalarının bulunduğu dizine terminalden girerek başlatma scriptini çalıştırmanız yeterlidir. Script, ilk çalıştırmada sizin yerinize bir `venv` oluşturacak, `requirements.txt` içerisindeki tüm bağımlılıkları indirecek ve sunucuyu başlatacaktır.
+### Frontend (Vercel)
+* Tüm arayüz (HTML/JS) kodları `public` klasöründedir.
+* GitHub master dalına kod atıldığında (`git push origin master`) Vercel otomatik olarak günceller.
+* Yönlendirmeler ana dizindeki `vercel.json` dosyası tarafından yönetilir.
 
+### Backend ve Worker (Google Cloud)
+Aşağıdaki komutlar üzerinden Google Cloud'a `gcloud` ile Docker imajı olarak yollanır:
 ```bash
-# Proje dizinine geçiş yapın
-cd "/home/selahaddin/Belgeler/Yüz_Tanıma_&_Kategori"
+# Proje ID ve Region
+PROJECT_ID=$(cat gcp_project_id.txt)
+REGION="europe-west1"
+IMAGE="europe-west1-docker.pkg.dev/${PROJECT_ID}/yuz-tanima-repo/app-image:latest"
 
-# Betiği çalıştırılabilir yapın (gerekliyse)
-chmod +x baslat.sh
+# 1. Image Build Etme
+gcloud builds submit --tag $IMAGE --project=$PROJECT_ID
 
-# Uygulamayı başlatın
-./baslat.sh
+# 2. Guest API Güncelleme
+gcloud run deploy guest-api --image $IMAGE --cpu 2 --min-instances 1 --region $REGION --project $PROJECT_ID
+
+# 3. Worker Job Güncelleme
+gcloud run jobs update face-worker-job --image $IMAGE --cpu 2 --region $REGION --project $PROJECT_ID
 ```
-
-**Not:** İlk analiz işleminde uygulamanın kullanacağı yapay zeka ağırlık dosyası (`buffalo_l` - ~330 MB) otomatik olarak indirileceği için kısa bir bekleme yaşanabilir. Sonraki analizler doğrudan diske önbelleklenmiş model üzerinden çok daha hızlı gerçekleşecektir.
