@@ -249,10 +249,9 @@ function selectEvent(ev, btnElement = null) {
     detailTitle.textContent = ev.title;
     detailDate.textContent = new Date(ev.event_date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
     
-    // Guest Link (using current origin or local testing)
-    // Note: To allow Vercel to work nicely, guest link should point to the domain where index.html is hosted.
-    // Since we are deploying both to the same Vercel project, guest link is just the same domain.
-    const guestUrl = `${window.location.origin}/?event_id=${ev.id}`;
+    // Guest Link (config.js'den gelen FRONTEND_URL kullanılır)
+    // Böylece stüdyoya Vercel üzerinden veya localhost'tan girilmesi fark etmeksizin doğru paylaşım linki üretilir.
+    const guestUrl = `${FRONTEND_URL}/?event_id=${ev.id}`;
     guestLinkInput.value = guestUrl;
     guestLinkBtn.href = guestUrl;
 
