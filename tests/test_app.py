@@ -18,23 +18,18 @@ st.markdown("Arka plandaki yüzleri elemek için doğru değerleri buradan inter
 
 DIR = "/home/selahaddin/Belgeler/denemeresim"
 
-if not os.path.exists(DIR):
-    st.error(f"Klasör bulunamadı: {DIR}")
-    st.stop()
-
-images = sorted([f for f in os.listdir(DIR) if f.lower().endswith(('.jpg', '.jpeg', '.png'))])
-if not images:
-    st.warning("Klasörde resim bulunamadı.")
-    st.stop()
+images = []
+if os.path.exists(DIR):
+    images = sorted([f for f in os.listdir(DIR) if f.lower().endswith(('.jpg', '.jpeg', '.png'))])
 
 # Session state navigasyonu
 if 'sb_select_box' not in st.session_state:
-    st.session_state.sb_select_box = images[0]
+    st.session_state.sb_select_box = images[0] if images else None
 
 # ─── Sol Menü: Ayarlar ────────────────────────────────────────────────────────
 st.sidebar.header("⚙️ Filtre Ayarları")
 
-min_face_size = st.sidebar.slider("MIN_FACE_SIZE (Boyut)", 20, 300, 120, 5, 
+min_face_size = st.sidebar.slider("MIN_FACE_SIZE (Boyut)", 20, 300, 50, 5, 
                                   help="Piksel cinsinden yüzün minimum genişliği/yüksekliği.")
 min_det_score = st.sidebar.slider("MIN_DET_SCORE (Doğruluk)", 0.0, 1.0, 0.7, 0.05,
                                   help="Yapay zekanın tespit ettiği bölgenin yüz olma ihtimali.")
@@ -42,31 +37,39 @@ min_blur_score = st.sidebar.slider("MIN_BLUR_SCORE (Bulanıklık)", 0.0, 100.0, 
                                    help="Netlik sınırı.")
 
 st.sidebar.markdown("---")
-st.sidebar.header("🖼️ Resim Seçimi")
+st.sidebar.header("📤 Fotoğraf Yükle")
+uploaded_file = st.sidebar.file_uploader("Kendi fotoğrafınızı yükleyin", type=["jpg", "jpeg", "png"])
+
+st.sidebar.markdown("---")
+st.sidebar.header("🖼️ Resim Seçimi (Klasörden)")
 
 # İleri - Geri Fonksiyonları
 def prev_image():
-    idx = images.index(st.session_state.sb_select_box)
-    if idx > 0:
-        st.session_state.sb_select_box = images[idx - 1]
+    if not images: return
+    if st.session_state.sb_select_box in images:
+        idx = images.index(st.session_state.sb_select_box)
+        if idx > 0:
+            st.session_state.sb_select_box = images[idx - 1]
 
 def next_image():
-    idx = images.index(st.session_state.sb_select_box)
-    if idx < len(images) - 1:
-        st.session_state.sb_select_box = images[idx + 1]
+    if not images: return
+    if st.session_state.sb_select_box in images:
+        idx = images.index(st.session_state.sb_select_box)
+        if idx < len(images) - 1:
+            st.session_state.sb_select_box = images[idx + 1]
 
-current_idx = images.index(st.session_state.sb_select_box)
+current_idx = images.index(st.session_state.sb_select_box) if (images and st.session_state.sb_select_box in images) else 0
 
 col_sb1, col_sb2 = st.sidebar.columns(2)
 with col_sb1:
-    st.button("⬅️ Önceki", on_click=prev_image, disabled=(current_idx == 0), use_container_width=True)
+    st.button("⬅️ Önceki", on_click=prev_image, disabled=(current_idx == 0 or not images), use_container_width=True)
 with col_sb2:
-    st.button("Sonraki ➡️", on_click=next_image, disabled=(current_idx == len(images) - 1), use_container_width=True)
+    st.button("Sonraki ➡️", on_click=next_image, disabled=(current_idx == len(images) - 1 or not images), use_container_width=True)
 
 # Selectbox ile de seçebilmesini sağla
 selected_image = st.sidebar.selectbox(
     "Veya Listeden Seç:", 
-    images, 
+    images if images else ["Resim bulunamadı"], 
     key="sb_select_box"
 )
 
@@ -79,22 +82,36 @@ st.sidebar.info("💡 Ayarları değiştirdiğinizde sonuçlar anında güncelle
 nav_c1, nav_c2, nav_c3 = st.columns([1, 3, 1])
 
 with nav_c1:
-    st.button("⬅️ Önceki Resim", key="main_prev", on_click=prev_image, disabled=(current_idx == 0), use_container_width=True)
+    st.button("⬅️ Önceki Resim", key="main_prev", on_click=prev_image, disabled=(current_idx == 0 or not images), use_container_width=True)
 
 with nav_c2:
-    st.markdown(f"<h4 style='text-align: center; margin:0;'>[{current_idx + 1} / {len(images)}] {current_image_name}</h4>", unsafe_allow_html=True)
+    if uploaded_file:
+        st.markdown(f"<h4 style='text-align: center; margin:0;'>Özel Yüklenen: {uploaded_file.name}</h4>", unsafe_allow_html=True)
+    elif images:
+        st.markdown(f"<h4 style='text-align: center; margin:0;'>[{current_idx + 1} / {len(images)}] {current_image_name}</h4>", unsafe_allow_html=True)
+    else:
+        st.markdown("<h4 style='text-align: center; margin:0;'>Lütfen sol menüden resim yükleyin.</h4>", unsafe_allow_html=True)
 
 with nav_c3:
-    st.button("Sonraki Resim ➡️", key="main_next", on_click=next_image, disabled=(current_idx == len(images) - 1), use_container_width=True)
+    st.button("Sonraki Resim ➡️", key="main_next", on_click=next_image, disabled=(current_idx == len(images) - 1 or not images), use_container_width=True)
 
 st.markdown("---")
 
 # ─── Analiz ve Gösterim ────────────────────────────────────────────────────────
 analyzer = get_analyzer()
-filepath = os.path.join(DIR, current_image_name)
 
 # Resmi oku
-img_cv2 = cv2.imread(filepath)
+img_cv2 = None
+if uploaded_file is not None:
+    file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
+    img_cv2 = cv2.imdecode(file_bytes, 1)
+elif images and current_image_name and current_image_name != "Resim bulunamadı":
+    filepath = os.path.join(DIR, current_image_name)
+    img_cv2 = cv2.imread(filepath)
+else:
+    st.info("Test etmek için sol taraftan bir fotoğraf yükleyin.")
+    st.stop()
+
 if img_cv2 is None:
     st.error("Resim okunamadı.")
     st.stop()

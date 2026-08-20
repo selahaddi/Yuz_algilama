@@ -273,6 +273,56 @@ window.copyGuestLink = function() {
     setTimeout(() => { guestLinkInput.nextElementSibling.textContent = orig; }, 2000);
 }
 
+window.handleDeleteEvent = async function() {
+    if (!currentEvent) return;
+    if (!confirm(`"${currentEvent.title}" etkinliğini ve tüm fotoğraflarını silmek istediğinize emin misiniz? Bu işlem geri alınamaz.`)) return;
+
+    try {
+        // Fotoğrafları al (storage'dan silmek için)
+        const { data: photos, error: fetchError } = await supabaseClient
+            .from('photos')
+            .select('image_url')
+            .eq('event_id', currentEvent.id);
+        
+        if (fetchError) throw fetchError;
+
+        // Storage'dan dosyaları sil
+        if (photos && photos.length > 0) {
+            const filesToRemove = photos.map(p => {
+                const parts = p.image_url.split('/');
+                return parts[parts.length - 1];
+            }).filter(Boolean);
+
+            // Chunk by 100 to avoid request too large errors if there are many photos
+            for (let i = 0; i < filesToRemove.length; i += 100) {
+                const chunk = filesToRemove.slice(i, i + 100);
+                await supabaseClient.storage.from('wedding_photos').remove(chunk);
+            }
+        }
+
+        // DB'den fotoğrafları sil
+        await supabaseClient.from('photos').delete().eq('event_id', currentEvent.id);
+        
+        // DB'den etkinliği sil
+        const { error: deleteError } = await supabaseClient
+            .from('events')
+            .delete()
+            .eq('id', currentEvent.id);
+        
+        if (deleteError) throw deleteError;
+
+        alert("Etkinlik başarıyla silindi.");
+        currentEvent = null;
+        emptyState.classList.remove('hidden');
+        eventDetails.classList.add('hidden');
+        await loadEvents();
+        
+    } catch (err) {
+        console.error("Silme hatası:", err);
+        alert("Silinirken bir hata oluştu: " + err.message);
+    }
+}
+
 // Event Stats Loader
 async function loadEventStats(evId) {
     statTotal.textContent = '...';

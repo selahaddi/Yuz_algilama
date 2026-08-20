@@ -147,7 +147,46 @@ if st.session_state.current_event is None:
     st.info("Sol menüden bir etkinlik seçin veya yeni bir etkinlik oluşturun.")
 else:
     ev = st.session_state.current_event
-    st.title(f"📂 Etkinlik: {ev['title']}")
+    
+    col_title, col_delete = st.columns([4, 1])
+    with col_title:
+        st.title(f"📂 Etkinlik: {ev['title']}")
+    with col_delete:
+        st.write("") # Spacer
+        if st.button("🗑️ Etkinliği Sil", use_container_width=True):
+            st.session_state.show_delete_confirm = True
+
+    if st.session_state.get("show_delete_confirm", False):
+        st.warning(f"⚠️ '{ev['title']}' etkinliğini ve tüm fotoğraflarını silmek istediğinize emin misiniz? Bu işlem geri alınamaz.")
+        c1, c2, _ = st.columns([1, 1, 2])
+        if c1.button("Evet, Sil", type="primary"):
+            try:
+                # 1. Get photos
+                photos_res = supabase.table("photos").select("image_url").eq("event_id", ev['id']).execute()
+                if photos_res.data:
+                    files_to_remove = []
+                    for p in photos_res.data:
+                        parts = p['image_url'].split('/')
+                        if len(parts) > 0:
+                            files_to_remove.append(parts[-1])
+                    if files_to_remove:
+                        supabase.storage.from_("wedding_photos").remove(files_to_remove)
+                
+                # 2. Delete photos from DB
+                supabase.table("photos").delete().eq("event_id", ev['id']).execute()
+                
+                # 3. Delete event
+                supabase.table("events").delete().eq("id", ev['id']).execute()
+                
+                st.session_state.current_event = None
+                st.session_state.show_delete_confirm = False
+                st.success("Etkinlik başarıyla silindi.")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Silinirken hata oluştu: {e}")
+        if c2.button("İptal"):
+            st.session_state.show_delete_confirm = False
+            st.rerun()
     
     # Misafir Linki (Çevresel değişkenden alınır, yoksa localhost kullanılır)
     base_url = os.environ.get("GUEST_API_URL", "https://guest-api-398389727192.europe-west1.run.app")
