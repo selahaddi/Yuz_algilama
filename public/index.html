@@ -1,6 +1,21 @@
 <!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport"><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={theme:{extend:{"colors":{"outline-variant":"#cec5ba","surface-tint":"#685d4a","secondary-fixed":"#ffd9dd","tertiary-fixed":"#e4e2e1","tertiary-fixed-dim":"#c8c6c6","on-secondary-container":"#7a3c46","error-container":"#ffdad6","inverse-primary":"#d3c5ad","surface-variant":"#e2e2e2","on-background":"#1a1c1c","on-error":"#ffffff","on-secondary":"#ffffff","primary-fixed":"#f0e0c8","tertiary-container":"#ebe8e8","on-surface-variant":"#4b463d","on-primary-container":"#726753","primary-container":"#f7e7ce","on-secondary-fixed-variant":"#70343e","surface":"#f9f9f9","tertiary":"#5f5e5e","on-primary":"#ffffff","inverse-on-surface":"#f0f1f1","surface-bright":"#f9f9f9","surface-container-highest":"#e2e2e2","surface-container-lowest":"#ffffff","on-tertiary-container":"#696868","secondary-container":"#feaab6","secondary-fixed-dim":"#ffb2bc","background":"#f9f9f9","on-primary-fixed-variant":"#4f4533","on-tertiary":"#ffffff","on-secondary-fixed":"#3a0915","surface-container-high":"#e8e8e8","outline":"#7d766c","on-surface":"#1a1c1c","on-tertiary-fixed":"#1b1c1c","surface-container-low":"#f3f3f4","on-tertiary-fixed-variant":"#474747","primary":"#685d4a","secondary":"#8c4b55","on-error-container":"#93000a","primary-fixed-dim":"#d3c5ad","on-primary-fixed":"#221b0b","surface-dim":"#dadada","error":"#ba1a1a","surface-container":"#eeeeee","inverse-surface":"#2f3131"},"borderRadius":{"DEFAULT":"1rem","lg":"2rem","xl":"3rem","full":"9999px"},"spacing":{"xs":"4px","lg":"40px","margin-desktop":"80px","md":"24px","sm":"12px","xl":"64px","gutter":"20px","margin-mobile":"24px","base":"8px"},"fontFamily":{"display-lg-mobile":["Playfair Display"],"display-lg":["Playfair Display"],"label-md":["Inter"],"headline-md":["Playfair Display"],"body-md":["Inter"],"headline-md-mobile":["Playfair Display"],"body-lg":["Inter"],"title-lg":["Inter"],"label-sm":["Inter"]},"fontSize":{"display-lg-mobile":["32px",{"lineHeight":"1.2","fontWeight":"700"}],"display-lg":["48px",{"lineHeight":"1.1","letterSpacing":"-0.02em","fontWeight":"700"}],"label-md":["14px",{"lineHeight":"1.4","letterSpacing":"0.05em","fontWeight":"500"}],"headline-md":["32px",{"lineHeight":"1.3","fontWeight":"600"}],"body-md":["16px",{"lineHeight":"1.6","fontWeight":"400"}],"headline-md-mobile":["24px",{"lineHeight":"1.3","fontWeight":"600"}],"body-lg":["18px",{"lineHeight":"1.6","fontWeight":"400"}],"title-lg":["20px",{"lineHeight":"1.5","letterSpacing":"0.01em","fontWeight":"600"}],"label-sm":["12px",{"lineHeight":"1.2","fontWeight":"600"}]}}}}</script>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&amp;family=Playfair+Display:wght@100..900&amp;display=swap" rel="stylesheet"></head><body class="bg-background font-body-md text-on-background"><header class="fixed top-0 w-full z-50 bg-surface/60 backdrop-blur-xl border-b border-white/20 shadow-[0_4px_20px_rgba(51,51,51,0.05)]"><div class="h-20 max-w-[1280px] mx-auto px-margin-mobile lg:px-margin-desktop flex items-center justify-between"><div class="flex flex-col"><span class="font-headline-md text-headline-md-mobile lg:text-headline-md text-primary tracking-tight leading-none">Ayşe &amp; Ahmet</span><span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest mt-1">24 Ekim 2024</span></div></div></header><main class="w-full pt-20 pb-xl bg-background"><div class="flex flex-col w-full px-margin-mobile lg:px-margin-desktop gap-xl">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&amp;family=Playfair+Display:wght@100..900&amp;display=swap" rel="stylesheet">
+<link rel="manifest" href="/manifest.json">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+</head><body class="bg-background font-body-md text-on-background">
+<header id="main-header" class="fixed top-0 w-full z-50 bg-surface/60 backdrop-blur-xl border-b border-white/20 shadow-[0_4px_20px_rgba(51,51,51,0.05)]">
+<div class="h-20 max-w-[1280px] mx-auto px-margin-mobile lg:px-margin-desktop flex items-center justify-between">
+<div class="flex items-center gap-4">
+<img id="header-logo" src="" alt="Logo" class="h-10 hidden rounded-md object-contain">
+<div class="flex flex-col">
+<span class="font-headline-md text-headline-md-mobile lg:text-headline-md text-primary tracking-tight leading-none">Ayşe &amp; Ahmet</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest mt-1">24 Ekim 2024</span>
+</div>
+</div>
+</div>
+</header><main class="w-full pt-24 pb-xl bg-background"><div class="flex flex-col w-full px-margin-mobile lg:px-margin-desktop gap-xl">
 <div class="w-full max-w-[800px] mx-auto flex p-1 bg-surface-container-high rounded-full shadow-inner relative" id="tab-group">
 <div class="absolute inset-y-1 w-[calc(50%-4px)] bg-surface rounded-full shadow-md transition-transform duration-300 ease-out z-0" id="tab-indicator" style="transform: translateX(100%);"></div>
 <button class="flex-1 py-3 text-center rounded-full font-label-md md:font-title-lg text-sm md:text-title-lg relative z-10 transition-colors text-on-surface-variant" onclick="switchTab(0, this)">Selfie ile Bul</button>
@@ -13,9 +28,16 @@
 </div>
 <div class="max-w-[600px] w-full mx-auto bg-surface-container-low rounded-3xl p-6 shadow-xl relative overflow-hidden">
 <div class="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent pointer-events-none"></div>
-<div class="flex p-1 bg-surface rounded-lg w-full max-w-[300px] mx-auto mb-8 shadow-sm" id="input-mode-group">
+<div class="flex p-1 bg-surface rounded-lg w-full max-w-[300px] mx-auto mb-4 shadow-sm" id="input-mode-group">
 <button class="flex-1 py-2 text-center rounded-md font-label-md text-label-md bg-primary text-on-primary transition-all shadow" onclick="switchInputMode('camera', this)">Kamera</button>
 <button class="flex-1 py-2 text-center rounded-md font-label-md text-label-md text-on-surface-variant hover:text-primary transition-all" onclick="switchInputMode('upload', this)">Yükle</button>
+</div>
+<div class="mb-8 max-w-[300px] mx-auto">
+    <label class="block text-xs font-semibold text-on-surface-variant mb-1 text-center">Grup Özçekim Modu</label>
+    <select id="search-mode-select" class="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 text-sm outline-none focus:border-primary">
+        <option value="single">Herhangi biri yeterli (Varsayılan)</option>
+        <option value="all">Sadece hepimizin bir arada oldukları</option>
+    </select>
 </div>
 <div class="flex flex-col gap-4" id="camera-view">
 <div class="relative w-full aspect-[4/3] rounded-2xl overflow-hidden bg-black shadow-inner flex items-center justify-center">
@@ -53,7 +75,9 @@
 <div class="hidden flex flex-col gap-md mt-lg" id="selfie-results">
 <div class="flex items-center justify-between">
 <h3 class="font-headline-md text-headline-md text-on-surface">12 Eşleşme Bulundu</h3>
-<button class="text-primary font-label-md text-label-md flex items-center gap-1 hover:underline"><span class="material-symbols-outlined text-[18px]">download</span> Tümünü İndir</button>
+<button class="text-primary font-label-md text-label-md flex items-center gap-1 hover:underline" onclick="selectAllPhotos('selfie-grid')">
+    <span class="material-symbols-outlined text-[18px]">checklist</span> Tümünü Seç
+</button>
 </div>
 <div class="columns-1 md:columns-2 lg:columns-3 gap-md space-y-md" id="selfie-grid">
 </div>
@@ -75,16 +99,62 @@
 <div class="hidden flex flex-col gap-md mt-lg relative z-0" id="browse-results">
 <div class="flex items-center justify-between">
 <h3 class="font-headline-md text-headline-md text-on-surface" id="browse-results-title">Kişi #1'in Fotoğrafları</h3>
+<button class="text-primary font-label-md text-label-md flex items-center gap-1 hover:underline" onclick="selectAllPhotos('browse-grid')">
+    <span class="material-symbols-outlined text-[18px]">checklist</span> Tümünü Seç
+</button>
 </div>
 <div class="columns-1 md:columns-2 lg:columns-3 gap-md space-y-md" id="browse-grid">
 </div>
 </div>
 </div>
 </div>
+<div class="fixed bottom-0 left-0 w-full bg-surface border-t border-outline-variant shadow-[0_-4px_20px_rgba(0,0,0,0.1)] p-4 transform translate-y-full transition-transform duration-300 z-40 flex flex-col md:flex-row items-center justify-between gap-4" id="cart-footer">
+    <div class="flex items-center gap-4">
+        <div class="w-12 h-12 bg-primary text-on-primary rounded-full flex items-center justify-center font-bold text-lg" id="cart-count">0</div>
+        <div>
+            <p class="font-bold text-on-surface">Fotoğraf Seçildi</p>
+            <p class="text-sm text-primary font-bold" id="cart-total">Toplam: 0 TL</p>
+        </div>
+    </div>
+    <div class="flex gap-2 w-full md:w-auto">
+        <button class="flex-1 md:flex-none px-6 py-3 rounded-xl bg-outline-variant text-on-surface font-bold transition-colors hover:bg-outline" onclick="downloadCart()">
+            İndir (ZIP)
+        </button>
+        <button class="flex-1 md:flex-none px-6 py-3 rounded-xl bg-primary text-on-primary font-bold shadow-lg transition-transform hover:scale-105" onclick="checkoutCart()" id="checkout-btn">
+            Sipariş Ver
+        </button>
+    </div>
+</div>
+
+<!-- Lightbox Modal -->
+<div id="lightbox-modal" class="fixed inset-0 bg-black/90 z-[60] hidden flex-col items-center justify-center">
+    <button class="absolute top-4 right-4 text-white hover:text-primary transition-colors p-2" onclick="closeLightbox()">
+        <span class="material-symbols-outlined text-4xl">close</span>
+    </button>
+    <img id="lightbox-img" src="" class="max-w-[90vw] max-h-[80vh] object-contain rounded-lg shadow-2xl">
+    <div class="absolute bottom-8 flex gap-4">
+        <button id="lightbox-feedback-btn" class="px-4 py-2 bg-error/20 text-error-container border border-error rounded-full font-label-md flex items-center gap-2 hover:bg-error/40 transition-colors" onclick="reportFeedback()">
+            <span class="material-symbols-outlined">report</span> Bu ben değilim
+        </button>
+        <button class="px-4 py-2 bg-primary text-on-primary rounded-full font-label-md flex items-center gap-2 hover:bg-surface-tint transition-colors" onclick="downloadLightboxImage()">
+            <span class="material-symbols-outlined">download</span> İndir
+        </button>
+    </div>
+</div>
+
 <script src="/config.js"></script>
 <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW registration failed:', err));
+      });
+    }
+
     const urlParams = new URLSearchParams(window.location.search);
     const eventId = urlParams.get('event_id');
+    let eventData = null;
+    let selectedCart = new Map(); // photo_id -> photo object
+    let currentLightboxPhoto = null;
     
     if (!eventId) {
         window.location.href = 'event_not_found.html';
@@ -94,18 +164,41 @@
 
     // Load Event Details
     fetch(GUEST_API_URL + '/api/event/' + eventId, {
-        headers: {
-            'Bypass-Tunnel-Reminder': 'true'
-        }
+        headers: { 'Bypass-Tunnel-Reminder': 'true' }
     })
         .then(res => {
             if(!res.ok) throw new Error("Event not found");
             return res.json();
         })
         .then(data => {
+            eventData = data;
             document.querySelector('.font-headline-md').innerText = data.title;
             if(data.event_date) {
                 document.querySelector('.font-label-sm.text-on-surface-variant').innerText = data.event_date;
+            }
+            
+            // White-label: Apply Studio Settings if available
+            if (data.studio) {
+                if (data.studio.primary_color) {
+                    document.documentElement.style.setProperty('--primary', data.studio.primary_color);
+                    // Add tailwind arbitrary value override logic if possible, 
+                    // or just rely on CSS overrides if we had CSS vars. 
+                    // Since Tailwind is used statically with config script, we can modify config and re-parse (not trivial).
+                    // As a workaround, we can inject a style tag to override .bg-primary etc.
+                    const style = document.createElement('style');
+                    style.innerHTML = `
+                        .bg-primary { background-color: ${data.studio.primary_color} !important; }
+                        .text-primary { color: ${data.studio.primary_color} !important; }
+                        .border-primary { border-color: ${data.studio.primary_color} !important; }
+                        .border-t-primary { border-top-color: ${data.studio.primary_color} !important; }
+                    `;
+                    document.head.appendChild(style);
+                }
+                if (data.studio.logo_url) {
+                    const logoEl = document.getElementById('header-logo');
+                    logoEl.src = data.studio.logo_url;
+                    logoEl.classList.remove('hidden');
+                }
             }
         })
         .catch(err => {
@@ -230,16 +323,225 @@
         const heights = ['h-64', 'h-80', 'h-96'];
         const randomHeight = heights[Math.floor(Math.random() * heights.length)];
         const displayUrl = photo.thumbnail_url || photo.image_url;
+        const isSelected = selectedCart.has(photo.id);
+        const encodedPhoto = encodeURIComponent(JSON.stringify(photo));
+        
         return `
-            <div class="relative group rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-500 break-inside-avoid ${randomHeight} bg-surface-dim transform hover:-translate-y-1">
+            <div class="relative group rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 break-inside-avoid ${randomHeight} bg-surface-dim transform hover:-translate-y-1 cursor-pointer" id="card-${photo.id}" onclick="toggleSelectPhoto('${photo.id}', '${encodedPhoto}')">
                 <img src="${displayUrl}" class="w-full h-full object-cover">
-                <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
-                    <a href="${photo.image_url}" target="_blank" class="w-full py-2 bg-white/20 backdrop-blur-md rounded-lg text-white font-label-md text-label-md flex items-center justify-center gap-2 hover:bg-white/40 transition-colors">
-                        <span class="material-symbols-outlined text-[20px]">download</span> İndir
-                    </a>
+                
+                <!-- Selection Overlay -->
+                <div class="absolute inset-0 border-4 transition-colors duration-200 ${isSelected ? 'border-primary bg-primary/10' : 'border-transparent group-hover:bg-black/20'}"></div>
+                
+                <!-- Checkbox -->
+                <div class="absolute top-4 left-4 w-8 h-8 rounded-full border-2 transition-colors flex items-center justify-center ${isSelected ? 'bg-primary border-primary text-white' : 'border-white bg-black/20 text-transparent'}">
+                    <span class="material-symbols-outlined text-[20px]">check</span>
+                </div>
+                
+                <!-- Actions -->
+                <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-end p-4">
+                    <button onclick="event.stopPropagation(); openLightbox('${encodedPhoto}')" class="p-2 bg-white/20 backdrop-blur-md rounded-full text-white hover:bg-white/40 transition-colors mr-2">
+                        <span class="material-symbols-outlined">fullscreen</span>
+                    </button>
                 </div>
             </div>
         `;
+    }
+
+    function toggleSelectPhoto(photoId, encodedPhoto) {
+        if(selectedCart.has(photoId)) {
+            selectedCart.delete(photoId);
+        } else {
+            selectedCart.set(photoId, JSON.parse(decodeURIComponent(encodedPhoto)));
+        }
+        updateCartUI();
+        
+        // Update specific card visually if it exists in DOM
+        const card = document.getElementById(`card-${photoId}`);
+        if(card) {
+            const isSelected = selectedCart.has(photoId);
+            const overlay = card.querySelector('.absolute.inset-0.border-4');
+            const checkbox = card.querySelector('.absolute.top-4');
+            if(isSelected) {
+                overlay.className = "absolute inset-0 border-4 transition-colors duration-200 border-primary bg-primary/10";
+                checkbox.className = "absolute top-4 left-4 w-8 h-8 rounded-full border-2 transition-colors flex items-center justify-center bg-primary border-primary text-white";
+            } else {
+                overlay.className = "absolute inset-0 border-4 transition-colors duration-200 border-transparent group-hover:bg-black/20";
+                checkbox.className = "absolute top-4 left-4 w-8 h-8 rounded-full border-2 transition-colors flex items-center justify-center border-white bg-black/20 text-transparent";
+            }
+        }
+    }
+
+    function selectAllPhotos(gridId) {
+        // Find all cards in this grid
+        const grid = document.getElementById(gridId);
+        const cards = grid.querySelectorAll('[id^="card-"]');
+        let allAdded = true;
+        
+        cards.forEach(card => {
+            const photoId = card.id.replace('card-', '');
+            if(!selectedCart.has(photoId)) {
+                card.click(); // This will toggle and add
+                allAdded = false;
+            }
+        });
+        
+        // If all were already added, deselect all
+        if (allAdded) {
+            cards.forEach(card => card.click());
+        }
+    }
+
+    function updateCartUI() {
+        const count = selectedCart.size;
+        const footer = document.getElementById('cart-footer');
+        const countEl = document.getElementById('cart-count');
+        const totalEl = document.getElementById('cart-total');
+        
+        if (count > 0) {
+            footer.classList.remove('translate-y-full');
+            countEl.innerText = count;
+            const price = eventData?.price_per_photo || 0;
+            const total = count * price;
+            totalEl.innerText = price > 0 ? `Toplam: ${total} TL` : `Ücretsiz`;
+            
+            document.getElementById('checkout-btn').innerText = price > 0 ? 'Satın Al / Sipariş Ver' : 'Sipariş İste';
+        } else {
+            footer.classList.add('translate-y-full');
+        }
+    }
+
+    // Lightbox Logic
+    function openLightbox(encodedPhoto) {
+        const photo = JSON.parse(decodeURIComponent(encodedPhoto));
+        currentLightboxPhoto = photo;
+        const modal = document.getElementById('lightbox-modal');
+        const img = document.getElementById('lightbox-img');
+        img.src = photo.image_url; // Use original for fullscreen
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+
+    function closeLightbox() {
+        const modal = document.getElementById('lightbox-modal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        currentLightboxPhoto = null;
+        document.getElementById('lightbox-img').src = '';
+    }
+    
+    function downloadLightboxImage() {
+        if(!currentLightboxPhoto) return;
+        saveAs(currentLightboxPhoto.image_url, `photo_${currentLightboxPhoto.id}.jpg`);
+    }
+
+    async function reportFeedback() {
+        if(!currentLightboxPhoto) return;
+        if(confirm("Bu fotoğrafta eşleşme hatası olduğunu bildirmek istiyor musunuz?")) {
+            const btn = document.getElementById('lightbox-feedback-btn');
+            btn.innerHTML = '<span class="material-symbols-outlined animate-spin">refresh</span> Gönderiliyor...';
+            try {
+                await fetch(GUEST_API_URL + '/api/feedback', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        event_id: eventId,
+                        photo_id: currentLightboxPhoto.id,
+                        cluster_id: document.getElementById('person-select-hidden').value || null
+                    })
+                });
+                alert("Bildiriminiz alındı, teşekkürler.");
+            } catch(e) {
+                alert("Bildirim gönderilemedi.");
+            }
+            btn.innerHTML = '<span class="material-symbols-outlined">report</span> Bu ben değilim';
+            closeLightbox();
+        }
+    }
+
+    async function downloadCart() {
+        if (selectedCart.size === 0) return;
+        const zip = new JSZip();
+        const folder = zip.folder("Fotograflar");
+        let i = 1;
+        
+        // Show loading indicator in button
+        const btn = document.querySelector('button[onclick="downloadCart()"]');
+        const originalText = btn.innerText;
+        btn.innerText = "Hazırlanıyor...";
+        
+        try {
+            for (const [id, photo] of selectedCart.entries()) {
+                const response = await fetch(photo.image_url);
+                const blob = await response.blob();
+                folder.file(`photo_${i}.jpg`, blob);
+                i++;
+            }
+            const content = await zip.generateAsync({type:"blob"});
+            saveAs(content, "Fotograflar.zip");
+        } catch (error) {
+            console.error(error);
+            alert("İndirme sırasında bir hata oluştu.");
+        } finally {
+            btn.innerText = originalText;
+        }
+    }
+
+    async function checkoutCart() {
+        if (selectedCart.size === 0) return;
+        
+        const photoIds = Array.from(selectedCart.keys());
+        const price = eventData?.price_per_photo || 0;
+        const totalAmount = photoIds.length * price;
+        
+        let customerName = prompt("Sipariş için adınız soyadınız:");
+        let contactInfo = prompt("İletişim bilgisi (E-Posta veya Telefon):");
+        
+        if(!customerName || !contactInfo) {
+            alert("Sipariş iptal edildi.");
+            return;
+        }
+        
+        const btn = document.getElementById('checkout-btn');
+        const origText = btn.innerText;
+        btn.innerText = "Gönderiliyor...";
+        btn.disabled = true;
+
+        try {
+            const res = await fetch(GUEST_API_URL + '/api/order', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    event_id: eventId,
+                    customer_name: customerName,
+                    contact_info: contactInfo,
+                    total_amount: totalAmount,
+                    photo_ids: photoIds
+                })
+            });
+            const data = await res.json();
+            
+            if(res.ok) {
+                alert("Siparişiniz başarıyla alındı! Stüdyo sizinle iletişime geçecektir.");
+                selectedCart.clear();
+                updateCartUI();
+                
+                // Remove visual selection from all cards
+                document.querySelectorAll('[id^="card-"]').forEach(card => {
+                    const overlay = card.querySelector('.absolute.inset-0.border-4');
+                    const checkbox = card.querySelector('.absolute.top-4');
+                    if (overlay) overlay.className = "absolute inset-0 border-4 transition-colors duration-200 border-transparent group-hover:bg-black/20";
+                    if (checkbox) checkbox.className = "absolute top-4 left-4 w-8 h-8 rounded-full border-2 transition-colors flex items-center justify-center border-white bg-black/20 text-transparent";
+                });
+            } else {
+                throw new Error(data.detail || "Sipariş hatası");
+            }
+        } catch(e) {
+            alert("Hata: " + e.message);
+        } finally {
+            btn.innerText = origText;
+            btn.disabled = false;
+        }
     }
 
     function populateGrid(gridId, photos) {
@@ -276,9 +578,11 @@
     function uploadAndSearch(fileBlob) {
         const overlay = document.getElementById('analysis-overlay');
         const results = document.getElementById('selfie-results');
+        const searchMode = document.getElementById('search-mode-select').value;
         const formData = new FormData();
         formData.append('file', fileBlob);
         formData.append('event_id', eventId);
+        formData.append('search_mode', searchMode);
         
         overlay.classList.remove('hidden');
         overlay.classList.add('flex');

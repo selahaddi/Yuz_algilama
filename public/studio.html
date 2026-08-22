@@ -8,6 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f9f9f9; color: #1a1c1c; }
         .glass-panel { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.3); }
@@ -92,9 +93,14 @@
                     <h2 class="text-lg font-bold truncate" id="sidebar-studio-name">Stüdyo</h2>
                     <p class="text-xs text-[#696868]" id="sidebar-studio-email">Yükleniyor...</p>
                 </div>
-                <button onclick="handleLogout()" title="Çıkış Yap" class="p-2 rounded-full hover:bg-[#f3f3f4] text-[#696868] transition-colors">
-                    <span class="material-symbols-outlined">logout</span>
-                </button>
+                <div class="flex gap-2">
+                    <button onclick="toggleSettingsModal(true)" title="Ayarlar" class="p-2 rounded-full hover:bg-[#f3f3f4] text-[#696868] transition-colors">
+                        <span class="material-symbols-outlined">settings</span>
+                    </button>
+                    <button onclick="handleLogout()" title="Çıkış Yap" class="p-2 rounded-full hover:bg-[#f3f3f4] text-[#696868] transition-colors">
+                        <span class="material-symbols-outlined">logout</span>
+                    </button>
+                </div>
             </div>
             
             <div class="p-4 flex-1 overflow-y-auto">
@@ -138,11 +144,28 @@
                 </div>
 
                 <!-- Event Stats -->
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
                     <div class="glass-panel p-4 rounded-xl text-center shadow-sm">
-                        <p class="text-xs text-[#696868] font-bold uppercase">Toplam Fotoğraf</p>
+                        <p class="text-xs text-[#696868] font-bold uppercase">Toplam Foto</p>
                         <p class="text-3xl font-bold mt-1 text-[#685d4a]" id="stat-total">-</p>
                     </div>
+                    <div class="glass-panel p-4 rounded-xl text-center shadow-sm">
+                        <p class="text-xs text-[#696868] font-bold uppercase">Bulunan Kişi</p>
+                        <p class="text-3xl font-bold mt-1 text-[#685d4a]" id="stat-people">-</p>
+                    </div>
+                    <div class="glass-panel p-4 rounded-xl text-center shadow-sm">
+                        <p class="text-xs text-[#696868] font-bold uppercase">Bekleyen</p>
+                        <p class="text-3xl font-bold mt-1 text-[#685d4a]" id="stat-pending">-</p>
+                    </div>
+                    <div class="glass-panel p-4 rounded-xl text-center shadow-sm">
+                        <p class="text-xs text-[#696868] font-bold uppercase">İşlenmiş</p>
+                        <p class="text-3xl font-bold mt-1 text-[#685d4a]" id="stat-processed">-</p>
+                    </div>
+                    <div class="glass-panel p-4 rounded-xl text-center shadow-sm bg-[#f0e0c8]/20 border-[#685d4a]/20">
+                        <p class="text-xs text-[#685d4a] font-bold uppercase">Bekleyen Sipariş</p>
+                        <p class="text-3xl font-bold mt-1 text-[#685d4a]" id="stat-orders">0</p>
+                    </div>
+                </div>
                     <div class="glass-panel p-4 rounded-xl text-center shadow-sm">
                         <p class="text-xs text-[#696868] font-bold uppercase">Bulunan Kişi</p>
                         <p class="text-3xl font-bold mt-1 text-[#685d4a]" id="stat-people">-</p>
@@ -169,10 +192,16 @@
                             <button onclick="copyGuestLink()" class="px-4 py-2 bg-[#f3f3f4] hover:bg-[#e8e8e8] text-[#1a1c1c] font-medium text-sm transition-colors border-l border-[#e2e2e2]">Kopyala</button>
                         </div>
                     </div>
-                    <a id="guest-link-btn" href="#" target="_blank" class="shrink-0 h-10 px-6 rounded-lg bg-white border border-[#cec5ba] flex items-center gap-2 text-sm font-medium hover:bg-[#f9f9f9] transition-colors whitespace-nowrap">
-                        <span class="material-symbols-outlined text-[18px]">open_in_new</span>
-                        Linki Aç
-                    </a>
+                    <div class="flex gap-2 shrink-0">
+                        <button onclick="showQRCode()" class="h-10 px-4 rounded-lg bg-[#f0e0c8] text-[#685d4a] font-medium text-sm transition-colors hover:bg-[#e4d3ba] flex items-center gap-2">
+                            <span class="material-symbols-outlined text-[18px]">qr_code_2</span>
+                            QR Kod
+                        </button>
+                        <a id="guest-link-btn" href="#" target="_blank" class="h-10 px-4 rounded-lg bg-white border border-[#cec5ba] flex items-center gap-2 text-sm font-medium hover:bg-[#f9f9f9] transition-colors whitespace-nowrap">
+                            <span class="material-symbols-outlined text-[18px]">open_in_new</span>
+                            Aç
+                        </a>
+                    </div>
                 </div>
 
                 <!-- Upload Panel -->
@@ -202,7 +231,13 @@
                         </div>
                     </div>
 
-                    <div class="mt-6 flex justify-end gap-3">
+                    <div class="mt-6 flex justify-end gap-3" id="upload-controls">
+                        <button id="btn-pause" class="btn-outline py-3 px-6 rounded-xl font-medium hidden" onclick="pauseUpload()">
+                            Duraklat
+                        </button>
+                        <button id="btn-resume" class="btn-primary py-3 px-6 rounded-xl font-medium hidden" onclick="resumeUpload()">
+                            Devam Et
+                        </button>
                         <button id="btn-upload" class="btn-primary py-3 px-6 rounded-xl font-medium hidden" onclick="startUpload()">
                             Yüklemeyi Başlat
                         </button>
@@ -237,11 +272,60 @@
                     <label class="block text-xs font-semibold text-[#4b463d] mb-1">Tarih</label>
                     <input type="date" id="new-event-date" class="input-field" required>
                 </div>
+                <div>
+                    <label class="block text-xs font-semibold text-[#4b463d] mb-1">Fotoğraf Fiyatı (TL) - 0 ise ücretsiz</label>
+                    <input type="number" id="new-event-price" class="input-field" value="0" min="0" step="1" required>
+                </div>
                 <button type="submit" class="btn-primary w-full py-3 rounded-xl font-medium mt-4 flex items-center justify-center gap-2">
                     <span id="create-event-spinner" class="spinner hidden"></span>
                     Oluştur
                 </button>
             </form>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="toggleSettingsModal(false)"></div>
+        <div class="bg-white rounded-3xl p-8 w-full max-w-md relative z-10 shadow-2xl animate-fade-in-up">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold">Stüdyo Ayarları</h2>
+                <button onclick="toggleSettingsModal(false)" class="text-[#696868] hover:text-[#1a1c1c]"><span class="material-symbols-outlined">close</span></button>
+            </div>
+            <form id="settings-form" onsubmit="handleUpdateSettings(event)" class="flex flex-col gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-[#4b463d] mb-1">Tema Rengi (HEX)</label>
+                    <div class="flex gap-2">
+                        <input type="color" id="settings-color-picker" class="h-11 rounded cursor-pointer border border-[#cec5ba]">
+                        <input type="text" id="settings-color" class="input-field flex-1 uppercase" placeholder="#685d4a">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-[#4b463d] mb-1">Logo URL (Boş bırakılabilir)</label>
+                    <input type="url" id="settings-logo" class="input-field" placeholder="https://site.com/logo.png">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-[#4b463d] mb-1">Filigran Metni (Boş bırakılabilir)</label>
+                    <input type="text" id="settings-watermark" class="input-field" placeholder="© 2024 Stüdyo Adı">
+                </div>
+                <button type="submit" class="btn-primary w-full py-3 rounded-xl font-medium mt-4 flex items-center justify-center gap-2">
+                    <span id="settings-spinner" class="spinner hidden"></span>
+                    Kaydet
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- QR Code Modal -->
+    <div id="qr-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="document.getElementById('qr-modal').classList.add('hidden')"></div>
+        <div class="bg-white rounded-3xl p-8 max-w-sm w-full relative z-10 shadow-2xl flex flex-col items-center">
+            <h3 class="text-xl font-bold mb-4">Etkinlik QR Kodu</h3>
+            <p class="text-sm text-center text-[#696868] mb-6">Misafirlerin bu QR kodu tarayarak etkinliğe ulaşmasını sağlayabilirsiniz.</p>
+            <div id="qrcode-container" class="bg-white p-4 rounded-xl border border-[#e2e2e2] shadow-sm mb-6"></div>
+            <button onclick="downloadQRCode()" class="btn-primary w-full py-3 rounded-xl font-medium flex items-center justify-center gap-2">
+                <span class="material-symbols-outlined">download</span> İndir
+            </button>
         </div>
     </div>
 

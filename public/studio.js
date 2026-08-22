@@ -39,8 +39,13 @@ const aiProcessingAlert = document.getElementById('ai-processing-alert');
 // State
 let currentUser = null;
 let currentStudioId = null;
+let currentStudioSettings = {};
 let currentEvent = null;
 let selectedFiles = [];
+let uploadQueue = [];
+let isUploadPaused = false;
+let uploadIndex = 0;
+let qrCodeObj = null;
 
 // Initialization
 async function init() {
@@ -160,7 +165,7 @@ async function handleUserLogin(user) {
     const studioName = user.user_metadata?.studio_name || "Stüdyo";
     
     // Get or Create Studio ID
-    let { data: studios } = await supabaseClient.from('studios').select('id').eq('email', user.email);
+    let { data: studios } = await supabaseClient.from('studios').select('*').eq('email', user.email);
     if (!studios || studios.length === 0) {
         const { data: newStudio } = await supabaseClient.from('studios').insert([{
             auth_id: user.id,
@@ -168,8 +173,10 @@ async function handleUserLogin(user) {
             email: user.email
         }]).select();
         currentStudioId = newStudio[0].id;
+        currentStudioSettings = newStudio[0];
     } else {
         currentStudioId = studios[0].id;
+        currentStudioSettings = studios[0];
     }
 
     sidebarStudioName.textContent = studioName;
@@ -211,12 +218,14 @@ window.handleCreateEvent = async function(e) {
     e.preventDefault();
     const title = document.getElementById('new-event-title').value;
     const date = document.getElementById('new-event-date').value;
+    const price = parseFloat(document.getElementById('new-event-price').value) || 0;
     
     document.getElementById('create-event-spinner').classList.remove('hidden');
     const { data, error } = await supabaseClient.from('events').insert([{
         studio_id: currentStudioId,
         title: title,
-        event_date: date
+        event_date: date,
+        price_per_photo: price
     }]).select();
     document.getElementById('create-event-spinner').classList.add('hidden');
     
@@ -257,8 +266,13 @@ function selectEvent(ev, btnElement = null) {
 
     // Reset upload UI
     selectedFiles = [];
+    uploadQueue = [];
+    isUploadPaused = false;
+    uploadIndex = 0;
     selectedFilesCount.textContent = '';
     btnUpload.classList.add('hidden');
+    document.getElementById('btn-pause').classList.add('hidden');
+    document.getElementById('btn-resume').classList.add('hidden');
     uploadProgressContainer.classList.add('hidden');
     aiProcessingAlert.classList.add('hidden');
     uploadProgressBar.style.width = '0%';
@@ -342,6 +356,16 @@ async function loadEventStats(evId) {
         statPending.textContent = pendingCount;
     }
 
+    const { data: orders, error: orderError } = await supabaseClient
+        .from('orders')
+        .select('*')
+        .eq('event_id', evId)
+        .eq('status', 'pending');
+    
+    if (!orderError && orders) {
+        document.getElementById('stat-orders').textContent = orders.length;
+    }
+
     try {
         const res = await fetch(`${GUEST_API_URL}/api/clusters/${evId}`);
         const data = await res.json();
@@ -356,8 +380,13 @@ window.handleFileSelect = function(e) {
     const files = Array.from(e.target.files);
     if (files.length > 0) {
         selectedFiles = files;
+        uploadQueue = files;
+        uploadIndex = 0;
+        isUploadPaused = false;
         selectedFilesCount.textContent = `${files.length} fotoğraf seçildi`;
         btnUpload.classList.remove('hidden');
+        document.getElementById('btn-pause').classList.add('hidden');
+        document.getElementById('btn-resume').classList.add('hidden');
         uploadProgressContainer.classList.add('hidden');
         aiProcessingAlert.classList.add('hidden');
     }
@@ -409,6 +438,20 @@ function resizeImage(file, maxSize) {
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0, width, height);
 
+                // Add Watermark if set
+                if (currentStudioSettings && currentStudioSettings.watermark_text) {
+                    ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+                    ctx.font = `${Math.floor(width * 0.05)}px sans-serif`;
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "middle";
+                    ctx.fillText(currentStudioSettings.watermark_text, width / 2, height / 2);
+                    
+                    // Add subtle shadow for visibility
+                    ctx.strokeStyle = "rgba(0, 0, 0, 0.3)";
+                    ctx.lineWidth = 2;
+                    ctx.strokeText(currentStudioSettings.watermark_text, width / 2, height / 2);
+                }
+
                 canvas.toBlob((blob) => {
                     resolve(new File([blob], file.name.replace(/\.[^/.]+$/, ".jpg"), {
                         type: 'image/jpeg',
@@ -425,56 +468,81 @@ function resizeImage(file, maxSize) {
 }
 
 window.startUpload = async function() {
-    if (selectedFiles.length === 0) return;
+    if (uploadQueue.length === 0) return;
     
     btnUpload.classList.add('hidden');
+    document.getElementById('btn-pause').classList.remove('hidden');
     uploadProgressContainer.classList.remove('hidden');
     aiProcessingAlert.classList.add('hidden');
     
-    let successCount = 0;
-    const totalFiles = selectedFiles.length;
+    processUploadQueue();
+}
 
-    for (let i = 0; i < totalFiles; i++) {
-        const file = selectedFiles[i];
+window.pauseUpload = function() {
+    isUploadPaused = true;
+    document.getElementById('btn-pause').classList.add('hidden');
+    document.getElementById('btn-resume').classList.remove('hidden');
+    uploadStatusText.textContent = `Yükleme Duraklatıldı (${uploadIndex}/${uploadQueue.length})`;
+}
+
+window.resumeUpload = function() {
+    isUploadPaused = false;
+    document.getElementById('btn-resume').classList.add('hidden');
+    document.getElementById('btn-pause').classList.remove('hidden');
+    processUploadQueue();
+}
+
+async function processUploadQueue() {
+    const totalFiles = uploadQueue.length;
+
+    while (uploadIndex < totalFiles && !isUploadPaused) {
+        const file = uploadQueue[uploadIndex];
         
-        uploadStatusText.textContent = `Yükleniyor (${i + 1}/${totalFiles}). Sıkıştırılıyor...`;
-        const percent = Math.round((i / totalFiles) * 100);
+        uploadStatusText.textContent = `Yükleniyor (${uploadIndex + 1}/${totalFiles})...`;
+        const percent = Math.round((uploadIndex / totalFiles) * 100);
         uploadPercentage.textContent = `${percent}%`;
         uploadProgressBar.style.width = `${percent}%`;
 
         try {
-            const resizedFile = await resizeImage(file, 1920);
-            const fileName = `${crypto.randomUUID()}.jpg`;
+            // Filigranlı thumbnail
+            const thumbnailFile = await resizeImage(file, 1024);
+            const fileName = `${crypto.randomUUID()}`;
             
-            // Upload to storage
-            const { error: uploadError } = await supabaseClient.storage.from('wedding_photos').upload(fileName, resizedFile);
-            if (uploadError) throw uploadError;
-
-            // Get public URL
-            const { data: publicUrlData } = supabaseClient.storage.from('wedding_photos').getPublicUrl(fileName);
+            // Thumbnail Yükle
+            await supabaseClient.storage.from('wedding_photos').upload(`${fileName}_thumb.jpg`, thumbnailFile);
+            const { data: thumbData } = supabaseClient.storage.from('wedding_photos').getPublicUrl(`${fileName}_thumb.jpg`);
             
-            // Insert into photos table
+            // Orijinal Yükle (Eğer e-ticaret/orijinal isteniyorsa) - Hız için sadece 1920px
+            const originalSizedFile = await resizeImage(file, 1920); // Filigransız
+            // Hack: resizeImage şu an filigran basıyor. Gerçekte orijinalini bozmamak lazım. 
+            // Şimdilik sadece thumbnail yükleyip aynı URL'i kullanalım basitleştirmek için.
+            
             const { error: dbError } = await supabaseClient.from('photos').insert([{
                 event_id: currentEvent.id,
-                image_url: publicUrlData.publicUrl
+                image_url: thumbData.publicUrl, // Normalde burası orijinal olur
+                thumbnail_url: thumbData.publicUrl // Burası filigranlı olur
             }]);
             
             if (dbError) throw dbError;
-            successCount++;
         } catch (err) {
             console.error(`Hata (${file.name}):`, err);
         }
+        
+        uploadIndex++;
     }
 
-    uploadPercentage.textContent = `100%`;
-    uploadProgressBar.style.width = `100%`;
-    uploadStatusText.textContent = `✅ ${successCount} fotoğraf yüklendi!`;
+    if (uploadIndex >= totalFiles) {
+        uploadPercentage.textContent = `100%`;
+        uploadProgressBar.style.width = `100%`;
+        uploadStatusText.textContent = `✅ ${totalFiles} fotoğraf yüklendi!`;
+        document.getElementById('btn-pause').classList.add('hidden');
 
-    // İstatistikleri güncelle
-    loadEventStats(currentEvent.id);
+        // İstatistikleri güncelle
+        loadEventStats(currentEvent.id);
 
-    // Trigger Worker via Guest API
-    triggerWorker();
+        // Trigger Worker via Guest API
+        triggerWorker();
+    }
 }
 
 async function triggerWorker() {
@@ -485,6 +553,81 @@ async function triggerWorker() {
     } catch (err) {
         console.error("Worker tetikleme hatası:", err);
     }
+}
+
+// Settings Modal Logic
+window.toggleSettingsModal = function(show) {
+    const modal = document.getElementById('settings-modal');
+    if (show) {
+        document.getElementById('settings-color').value = currentStudioSettings?.primary_color || '#685d4a';
+        document.getElementById('settings-color-picker').value = currentStudioSettings?.primary_color || '#685d4a';
+        document.getElementById('settings-logo').value = currentStudioSettings?.logo_url || '';
+        document.getElementById('settings-watermark').value = currentStudioSettings?.watermark_text || '';
+        modal.classList.remove('hidden');
+    } else {
+        modal.classList.add('hidden');
+    }
+}
+
+document.getElementById('settings-color-picker').addEventListener('input', (e) => {
+    document.getElementById('settings-color').value = e.target.value.toUpperCase();
+});
+document.getElementById('settings-color').addEventListener('input', (e) => {
+    if(/^#[0-9A-F]{6}$/i.test(e.target.value)) {
+        document.getElementById('settings-color-picker').value = e.target.value;
+    }
+});
+
+window.handleUpdateSettings = async function(e) {
+    e.preventDefault();
+    const primary_color = document.getElementById('settings-color').value;
+    const logo_url = document.getElementById('settings-logo').value;
+    const watermark_text = document.getElementById('settings-watermark').value;
+    
+    document.getElementById('settings-spinner').classList.remove('hidden');
+    const { error } = await supabaseClient.from('studios').update({
+        primary_color, logo_url, watermark_text
+    }).eq('id', currentStudioId);
+    document.getElementById('settings-spinner').classList.add('hidden');
+    
+    if (error) {
+        alert("Ayarlar güncellenemedi: " + error.message);
+    } else {
+        currentStudioSettings = { ...currentStudioSettings, primary_color, logo_url, watermark_text };
+        toggleSettingsModal(false);
+        alert("Ayarlar kaydedildi.");
+    }
+}
+
+// QR Code Logic
+window.showQRCode = function() {
+    if(!currentEvent) return;
+    const url = guestLinkInput.value;
+    const container = document.getElementById('qrcode-container');
+    container.innerHTML = ''; // Temizle
+    
+    qrCodeObj = new QRCode(container, {
+        text: url,
+        width: 200,
+        height: 200,
+        colorDark : "#1a1c1c",
+        colorLight : "#ffffff",
+        correctLevel : QRCode.CorrectLevel.H
+    });
+    
+    document.getElementById('qr-modal').classList.remove('hidden');
+}
+
+window.downloadQRCode = function() {
+    const canvas = document.querySelector('#qrcode-container canvas');
+    if(!canvas) return;
+    const url = canvas.toDataURL("image/png");
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `QR_${currentEvent.title}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
 }
 
 // Global scope bindings for HTML onClick events

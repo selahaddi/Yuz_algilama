@@ -16,7 +16,7 @@
 
 ## 4. Yapay Zeka (AI) ve Yüz Tanıma Parametreleri
 - **Eşik Değerleri (Thresholds):** Sistemdeki yüz tanıma doğruluğunu artırmak ve uzaktaki küçük yüzleri tespit edebilmek için sabit değerler şu şekildedir:
-  - `MIN_FACE_SIZE = 20` (Piksel cinsinden minimum yüz boyutu)
+  - `MIN_FACE_SIZE = 50` (Piksel cinsinden minimum yüz boyutu)
   - `MIN_DET_SCORE = 0.70` (Minimum yüz tespit doğruluk skoru)
   - `MIN_BLUR_SCORE = 15.00` (Minimum bulanıklık eşiği)
 - Bu değerler `worker.py` ve `tests/test_app.py` içinde standart olarak korunmalıdır.

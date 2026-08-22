@@ -7,6 +7,9 @@ CREATE TABLE IF NOT EXISTS studios (
     auth_id UUID, -- Supabase auth.users tablosundaki ID ile eşleşmesi için (Opsiyonel)
     name TEXT NOT NULL,
     email TEXT UNIQUE NOT NULL,
+    primary_color TEXT DEFAULT '#685d4a', -- White-label ana renk
+    logo_url TEXT, -- White-label logo URL
+    watermark_text TEXT, -- Stüdyonun fotoğraf üzerindeki filigran metni
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -16,6 +19,7 @@ CREATE TABLE IF NOT EXISTS events (
     studio_id UUID REFERENCES studios(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
     event_date DATE,
+    price_per_photo NUMERIC DEFAULT 0, -- 0 ise ücretsiz
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -45,6 +49,27 @@ CREATE INDEX IF NOT EXISTS faces_cluster_id_idx ON faces(cluster_id);
 CREATE INDEX IF NOT EXISTS photos_processed_idx ON photos(processed);
 CREATE INDEX IF NOT EXISTS photos_event_id_idx ON photos(event_id);
 CREATE INDEX IF NOT EXISTS faces_embedding_idx ON faces USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+
+-- 6. Siparişler (Sepet / Ödeme) Tablosu
+CREATE TABLE IF NOT EXISTS orders (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    event_id UUID REFERENCES events(id) ON DELETE CASCADE,
+    guest_name TEXT NOT NULL,
+    guest_contact TEXT NOT NULL, -- Email veya Telefon
+    photo_ids JSONB NOT NULL, -- Satın alınan/istenen fotoğrafların ID'leri listesi ["uuid1", "uuid2"]
+    total_price NUMERIC NOT NULL,
+    status TEXT DEFAULT 'pending', -- pending, completed, cancelled
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 7. Yüz Tanıma Geri Bildirimleri (Bu ben değilim) Tablosu
+CREATE TABLE IF NOT EXISTS feedbacks (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    face_id UUID REFERENCES faces(id) ON DELETE CASCADE,
+    photo_id UUID REFERENCES photos(id) ON DELETE CASCADE,
+    status TEXT DEFAULT 'wrong_match',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
 
 -- 6. RPC: Selfie ile Eşleşen Yüzleri Bulma Fonksiyonu
 -- Bu fonksiyon, verilen bir embedding'e (selfie) en yakın yüzleri `faces` tablosundan Cosine Distance ile bulur.
@@ -80,8 +105,12 @@ ALTER TABLE studios ENABLE ROW LEVEL SECURITY;
 ALTER TABLE events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE photos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE faces ENABLE ROW LEVEL SECURITY;
+ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE feedbacks ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow public all for studios" ON studios FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow public all for events" ON events FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow public all for photos" ON photos FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow public all for faces" ON faces FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public all for orders" ON orders FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public all for feedbacks" ON feedbacks FOR ALL USING (true) WITH CHECK (true);

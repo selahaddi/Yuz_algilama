@@ -77,15 +77,25 @@ avatar_cache = LRUAvatarCache(maxsize=200)
 
 @app.get("/api/event/{event_id}")
 def get_event(event_id: str):
-    res = supabase.table("events").select("*").eq("id", event_id).execute()
+    res = supabase.table("events").select("*, studios(name, primary_color, logo_url, watermark_text)").eq("id", event_id).execute()
     if not res.data:
         raise HTTPException(status_code=404, detail="Etkinlik bulunamadı")
-    return res.data[0]
+    event_data = res.data[0]
+    
+    # Düz (flat) formata çevirerek frontende dön (opsiyonel ama daha temiz olur)
+    studio = event_data.pop("studios", {})
+    if studio:
+        event_data["studio_name"] = studio.get("name")
+        event_data["primary_color"] = studio.get("primary_color") or "#685d4a"
+        event_data["logo_url"] = studio.get("logo_url")
+        event_data["watermark_text"] = studio.get("watermark_text")
+        
+    return event_data
 
 
 @app.post("/api/search_selfie")
-async def search_selfie(event_id: str = Form(...), file: UploadFile = File(...)):
-    # Model yalnızca bu endpoint çağrıldığında yüklenir (Lazy Loading)
+async def search_selfie(event_id: str = Form(...), search_mode: str = Form("single"), file: UploadFile = File(...)):
+    # search_mode: "single" (en büyük yüz), "any" (herhangi biri), "all" (herkesin olduğu)
     analyzer = get_analyzer()
 
     contents = await file.read()
@@ -99,22 +109,71 @@ async def search_selfie(event_id: str = Form(...), file: UploadFile = File(...))
     if not faces:
         raise HTTPException(status_code=400, detail="Yüz tespit edilemedi. Daha net bir fotoğraf yükleyin.")
         
-    # En büyük yüzü al (Selfie çeken kişi)
-    best_face = max(faces, key=lambda f: (f.bbox[2]-f.bbox[0])*(f.bbox[3]-f.bbox[1]))
-    embedding_list = best_face.embedding.astype(float).tolist()
-    embedding_str = f"[{','.join(map(str, embedding_list))}]"
-    
     try:
-        res = supabase.rpc(
-            "match_faces", 
-            {
-                "query_embedding": embedding_str,
-                "match_threshold": 0.45,
-                "match_count": 50,
-                "target_event_id": event_id
-            }
-        ).execute()
-        return {"matches": res.data}
+        if search_mode == "single" or len(faces) == 1:
+            # En büyük yüzü al (Selfie çeken kişi)
+            best_face = max(faces, key=lambda f: (f.bbox[2]-f.bbox[0])*(f.bbox[3]-f.bbox[1]))
+            embedding_list = best_face.embedding.astype(float).tolist()
+            embedding_str = f"[{','.join(map(str, embedding_list))}]"
+            
+            res = supabase.rpc(
+                "match_faces", 
+                {
+                    "query_embedding": embedding_str,
+                    "match_threshold": 0.45,
+                    "match_count": 50,
+                    "target_event_id": event_id
+                }
+            ).execute()
+            return {"matches": res.data}
+        else:
+            # Çoklu yüz araması
+            all_matches = []
+            for face in faces:
+                embedding_list = face.embedding.astype(float).tolist()
+                embedding_str = f"[{','.join(map(str, embedding_list))}]"
+                res = supabase.rpc(
+                    "match_faces", 
+                    {
+                        "query_embedding": embedding_str,
+                        "match_threshold": 0.45,
+                        "match_count": 100,
+                        "target_event_id": event_id
+                    }
+                ).execute()
+                all_matches.append(res.data)
+            
+            if search_mode == "any":
+                # Birleşim: Herhangi birinin olduğu fotoğrafları al, duplicate olanları id'ye göre çıkar
+                merged = {}
+                for matches in all_matches:
+                    for m in matches:
+                        merged[m["photo_id"]] = m
+                return {"matches": list(merged.values())}
+            
+            elif search_mode == "all":
+                # Kesişim: Herkesin olduğu fotoğrafları bul
+                if not all_matches:
+                    return {"matches": []}
+                
+                # İlk yüzün bulduğu photo_id'leri set olarak al
+                common_photo_ids = set([m["photo_id"] for m in all_matches[0]])
+                
+                # Diğer yüzlerin bulduğu photo_id'ler ile kesiştir
+                for matches in all_matches[1:]:
+                    current_ids = set([m["photo_id"] for m in matches])
+                    common_photo_ids = common_photo_ids.intersection(current_ids)
+                
+                # Sadece common olanları listele (tüm detayları ilk eşleşmeden alabiliriz)
+                merged = {}
+                for m in all_matches[0]:
+                    if m["photo_id"] in common_photo_ids:
+                        merged[m["photo_id"]] = m
+                
+                return {"matches": list(merged.values())}
+            
+            return {"matches": []}
+            
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -307,3 +366,44 @@ def trigger_worker():
 
 # Statik frontend dosyalarını servis et (HTML/CSS/JS)
 app.mount("/", StaticFiles(directory="public", html=True), name="public")
+
+class OrderRequest(BaseModel):
+    event_id: str
+    guest_name: str
+    guest_contact: str
+    photo_ids: list[str]
+    total_price: float
+
+@app.post("/api/order")
+def create_order(order: OrderRequest):
+    try:
+        data = {
+            "event_id": order.event_id,
+            "guest_name": order.guest_name,
+            "guest_contact": order.guest_contact,
+            "photo_ids": order.photo_ids,
+            "total_price": order.total_price,
+            "status": "pending"
+        }
+        res = supabase.table("orders").insert(data).execute()
+        return {"status": "success", "order": res.data[0]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class FeedbackRequest(BaseModel):
+    face_id: str
+    photo_id: str
+    status: str = "wrong_match"
+
+@app.post("/api/feedback")
+def submit_feedback(feedback: FeedbackRequest):
+    try:
+        data = {
+            "face_id": feedback.face_id,
+            "photo_id": feedback.photo_id,
+            "status": feedback.status
+        }
+        supabase.table("feedbacks").insert(data).execute()
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

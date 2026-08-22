@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 import sys, os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 from core.face_analyzer import FaceAnalyzer
 
 st.set_page_config(page_title="Yüz Filtre Test Aracı", layout="wide", page_icon="🧪")
@@ -115,6 +115,19 @@ else:
 if img_cv2 is None:
     st.error("Resim okunamadı.")
     st.stop()
+
+# Frontend (studio.js) boyutlandırma mantığı (Maks 1920px)
+max_size = 1920
+h, w = img_cv2.shape[:2]
+if w > max_size or h > max_size:
+    if w > h:
+        new_w = max_size
+        new_h = int((max_size / w) * h)
+    else:
+        new_h = max_size
+        new_w = int((max_size / h) * w)
+    img_cv2 = cv2.resize(img_cv2, (new_w, new_h), interpolation=cv2.INTER_AREA)
+    st.info(f"Gerçekçi test için fotoğraf canlı sistemdeki gibi {new_w}x{new_h} boyutuna küçültüldü.")
 
 img_rgb = cv2.cvtColor(img_cv2, cv2.COLOR_BGR2RGB)
 

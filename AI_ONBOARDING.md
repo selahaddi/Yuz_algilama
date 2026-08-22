@@ -28,7 +28,7 @@ Sistem 3 ana parçadan oluşmaktadır:
 - **Konum:** Kök dizindeki `worker.py` ve `core/` klasörü.
 - **Teknoloji:** Python, InsightFace (`buffalo_s`), Scikit-Learn (DBSCAN).
 - **İşlev:** Stüdyo yeni fotoğraflar yüklediğinde arka planda çalışır. Yüzleri tespit eder, 512 boyutlu vektör (embedding) çıkarır ve benzer yüzleri DBSCAN ile kümelendirir.
-- **Yüz Eşikleri:** Uzaktaki yüzleri kaçırmamak için: `MIN_FACE_SIZE = 20`, `MIN_DET_SCORE = 0.70`, `MIN_BLUR_SCORE = 15.00`.
+- **Yüz Eşikleri:** Uzaktaki yüzleri kaçırmamak için: `MIN_FACE_SIZE = 50`, `MIN_DET_SCORE = 0.70`, `MIN_BLUR_SCORE = 15.00`.
 
 ## 3. Veritabanı Yapısı (Supabase PostgreSQL)
 - **studios:** Kayıtlı fotoğrafçıları tutar.
