@@ -118,3 +118,11 @@ CREATE POLICY "Allow public all for feedbacks" ON feedbacks FOR ALL USING (true)
 -- Önemli Hata Çözümü: RLS açık bile olsa service_role ve anon'a temel yetkiler verilmelidir.
 GRANT ALL ON public.orders TO anon, authenticated, service_role;
 GRANT ALL ON public.feedbacks TO anon, authenticated, service_role;
+
+-- ==========================================
+-- GÜNCELLEMELER (V2) - Aşağıdaki komutları yeni özellikler için çalıştırın
+-- ==========================================
+ALTER TABLE events ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active';
+ALTER TABLE studios ADD COLUMN IF NOT EXISTS watermark_opacity NUMERIC DEFAULT 0.6;
+ALTER TABLE studios ADD COLUMN IF NOT EXISTS watermark_size NUMERIC DEFAULT 0.05;
+ALTER TABLE studios ADD COLUMN IF NOT EXISTS watermark_angle NUMERIC DEFAULT 0;

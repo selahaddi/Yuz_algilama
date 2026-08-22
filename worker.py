@@ -1,4 +1,10 @@
 import os
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
+
 import sys
 import time
 import json
@@ -47,7 +53,7 @@ except Exception as e:
     sys.exit(1)
 
 # ─── Yapılandırma Sabitleri ────────────────────────────────────────────────────
-BATCH_SIZE = 5              # Her turda en fazla kaç fotoğraf işlensin
+BATCH_SIZE = 20             # Her turda en fazla kaç fotoğraf işlensin
 RECLUSTER_EVERY_N = 10      # Kaç fotoğraftan sonra yeniden kümeleme yapılsın
 POLL_INTERVAL = 3            # Kuyruk boşken bekleme süresi (saniye)
 ERROR_BACKOFF_INITIAL = 5    # İlk hata bekleme süresi (saniye)

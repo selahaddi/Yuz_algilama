@@ -8,6 +8,7 @@
 
 ## 2. Maliyet ve Optimizasyon Kuralları (Cost Optimization)
 - Yüz tanıma işlemi (storage'a yazma süreci) öncesinde `public/studio.js` içinde `resizeImage` canvas fonksiyonu mevcuttur. Storage maliyetini önlemek için asla yüksek çözünürlüklü fotoğraflar doğrudan Supabase'e kaydedilmemelidir, tarayıcıda küçültülmelidir.
+- **Filigran (Watermark) Optimizasyonu:** Sunucu tarafında maliyet ve gecikmeyi önlemek için, filigran ayarları (opacity, size, angle, text, logo) fotoğraflar küçültülürken doğrudan frontend (Canvas) üzerinde uygulanır. Arka uca (backend) bu amaçla istek atılmaz.
 - Veritabanı şişkinliğini önlemek için `cleanup_events.py` aktif tutulmalıdır. Yeni veri tabloları oluşturulurken hep Storage maliyetleri dikkate alınmalıdır.
 
 ## 3. Kod ve Deployment Akışı

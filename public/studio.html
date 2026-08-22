@@ -23,6 +23,9 @@
         /* Spinner */
         .spinner { border: 3px solid rgba(0, 0, 0, 0.1); border-top-color: #685d4a; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
+        
+        .animate-fade-in-up { animation: fadeInUp 0.3s ease-out forwards; }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body class="min-h-screen flex text-on-background">
@@ -94,6 +97,10 @@
                     <p class="text-xs text-[#696868]" id="sidebar-studio-email">Yükleniyor...</p>
                 </div>
                 <div class="flex gap-2">
+                    <button id="notification-bell" title="Bildirimler" class="relative p-2 rounded-full hover:bg-[#f3f3f4] text-[#696868] transition-colors">
+                        <span class="material-symbols-outlined">notifications</span>
+                        <span id="notification-dot" class="hidden absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
+                    </button>
                     <button onclick="toggleSettingsModal(true)" title="Ayarlar" class="p-2 rounded-full hover:bg-[#f3f3f4] text-[#696868] transition-colors">
                         <span class="material-symbols-outlined">settings</span>
                     </button>
@@ -106,6 +113,10 @@
             <div class="p-4 flex-1 overflow-y-auto flex flex-col gap-4">
                 <!-- Navigation -->
                 <nav class="flex flex-col gap-1 mb-2">
+                    <button onclick="switchTab('dashboard')" id="tab-dashboard" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[#f3f3f4] text-[#696868] font-medium transition-colors">
+                        <span class="material-symbols-outlined text-[20px]">dashboard</span>
+                        Ana Sayfa
+                    </button>
                     <button onclick="switchTab('events')" id="tab-events" class="flex items-center gap-3 px-3 py-2 rounded-lg bg-[#f0e0c8] text-[#685d4a] font-medium transition-colors">
                         <span class="material-symbols-outlined text-[20px]">event</span>
                         Etkinlikler
@@ -121,7 +132,13 @@
                 </nav>
 
                 <div id="sidebar-events-section">
-                    <h3 class="text-xs font-bold text-[#696868] uppercase tracking-wider mb-4 px-2">Etkinlikleriniz</h3>
+                    <div class="flex justify-between items-center mb-4 px-2">
+                        <h3 class="text-xs font-bold text-[#696868] uppercase tracking-wider">Etkinlikleriniz</h3>
+                        <div class="flex gap-2">
+                            <button onclick="loadEvents('active')" id="filter-active" class="text-xs font-bold text-[#685d4a]">Aktif</button>
+                            <button onclick="loadEvents('archived')" id="filter-archived" class="text-xs text-[#696868] hover:text-[#685d4a]">Arşiv</button>
+                        </div>
+                    </div>
                     <div id="event-list" class="flex flex-col gap-1">
                         <!-- Events will be populated here -->
                     </div>
@@ -136,10 +153,58 @@
             </div>
         </div>
 
-        <!-- Main Content (Event Details) -->
+        <!-- Main Content -->
         <div class="flex-1 bg-[#f9f9f9] h-full overflow-y-auto relative" id="main-content">
-            <!-- Empty State -->
-            <div id="empty-state" class="absolute inset-0 flex flex-col items-center justify-center text-center p-8">
+            
+            <!-- Dashboard Details -->
+            <div id="dashboard-details" class="hidden max-w-5xl mx-auto p-8 pt-12 pb-24">
+                <div class="flex justify-between items-end mb-8">
+                    <div>
+                        <span class="text-xs font-bold text-[#685d4a] uppercase tracking-widest">Özet</span>
+                        <h1 class="text-4xl font-bold mt-1 text-[#1a1c1c] tracking-tight">Ana Sayfa</h1>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-[#e2e2e2] flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-full bg-green-100 text-green-600 flex items-center justify-center">
+                            <span class="material-symbols-outlined text-2xl">payments</span>
+                        </div>
+                        <div>
+                            <p class="text-sm text-[#696868] font-medium">Toplam Kazanç</p>
+                            <p class="text-2xl font-bold text-[#1a1c1c]" id="dash-total-revenue">0 TL</p>
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-[#e2e2e2] flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
+                            <span class="material-symbols-outlined text-2xl">event_available</span>
+                        </div>
+                        <div>
+                            <p class="text-sm text-[#696868] font-medium">Aktif Etkinlik</p>
+                            <p class="text-2xl font-bold text-[#1a1c1c]" id="dash-active-events">0</p>
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-[#e2e2e2] flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center">
+                            <span class="material-symbols-outlined text-2xl">pending_actions</span>
+                        </div>
+                        <div>
+                            <p class="text-sm text-[#696868] font-medium">Bekleyen Sipariş</p>
+                            <p class="text-2xl font-bold text-[#1a1c1c]" id="dash-pending-orders">0</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-3xl p-6 shadow-sm border border-[#e2e2e2]">
+                    <h2 class="text-lg font-bold mb-4">Son Siparişler</h2>
+                    <div id="dash-recent-orders" class="flex flex-col gap-3">
+                        <p class="text-sm text-[#696868]">Yükleniyor...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Empty State (No event selected) -->
+            <div id="empty-state" class="absolute inset-0 flex flex-col items-center justify-center text-center p-8 hidden">
                 <div class="w-24 h-24 rounded-full bg-[#f0e0c8] text-[#685d4a] flex items-center justify-center mb-6">
                     <span class="material-symbols-outlined text-5xl">folder_open</span>
                 </div>
@@ -148,126 +213,148 @@
             </div>
 
             <!-- Event Details -->
-            <div id="event-details" class="hidden max-w-4xl mx-auto p-8 pt-12 pb-24">
-                <div class="flex justify-between items-end mb-8">
+            <div id="event-details" class="hidden max-w-5xl mx-auto p-8 pt-12 pb-24">
+                <div class="flex flex-col md:flex-row md:justify-between md:items-end mb-8 gap-4">
                     <div>
                         <span class="text-xs font-bold text-[#685d4a] uppercase tracking-widest" id="detail-date">Tarih</span>
                         <h1 class="text-4xl font-bold mt-1 text-[#1a1c1c] tracking-tight" id="detail-title">Etkinlik Adı</h1>
+                        <span id="detail-status" class="mt-2 inline-block px-2 py-1 text-xs font-bold rounded-md bg-green-100 text-green-700">Aktif</span>
                     </div>
-                    <button onclick="handleDeleteEvent()" class="px-4 py-2 bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
-                        <span class="material-symbols-outlined text-[18px]">delete</span>
-                        Etkinliği Sil
-                    </button>
-                </div>
-
-                <!-- Event Stats -->
-                <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
-                    <div class="glass-panel p-4 rounded-xl text-center shadow-sm">
-                        <p class="text-xs text-[#696868] font-bold uppercase">Toplam Foto</p>
-                        <p class="text-3xl font-bold mt-1 text-[#685d4a]" id="stat-total">-</p>
-                    </div>
-                    <div class="glass-panel p-4 rounded-xl text-center shadow-sm">
-                        <p class="text-xs text-[#696868] font-bold uppercase">Bulunan Kişi</p>
-                        <p class="text-3xl font-bold mt-1 text-[#685d4a]" id="stat-people">-</p>
-                    </div>
-                    <div class="glass-panel p-4 rounded-xl text-center shadow-sm">
-                        <p class="text-xs text-[#696868] font-bold uppercase">Bekleyen</p>
-                        <p class="text-3xl font-bold mt-1 text-[#685d4a]" id="stat-pending">-</p>
-                    </div>
-                    <div class="glass-panel p-4 rounded-xl text-center shadow-sm">
-                        <p class="text-xs text-[#696868] font-bold uppercase">İşlenmiş</p>
-                        <p class="text-3xl font-bold mt-1 text-[#685d4a]" id="stat-processed">-</p>
-                    </div>
-                    <div class="glass-panel p-4 rounded-xl text-center shadow-sm bg-[#f0e0c8]/20 border-[#685d4a]/20">
-                        <p class="text-xs text-[#685d4a] font-bold uppercase">Bekleyen Sipariş</p>
-                        <p class="text-3xl font-bold mt-1 text-[#685d4a]" id="stat-orders">0</p>
-                    </div>
-                </div>
-                    <div class="glass-panel p-4 rounded-xl text-center shadow-sm">
-                        <p class="text-xs text-[#696868] font-bold uppercase">Bulunan Kişi</p>
-                        <p class="text-3xl font-bold mt-1 text-[#685d4a]" id="stat-people">-</p>
-                    </div>
-                    <div class="glass-panel p-4 rounded-xl text-center shadow-sm">
-                        <p class="text-xs text-[#696868] font-bold uppercase">Bekleyen</p>
-                        <p class="text-3xl font-bold mt-1 text-[#685d4a]" id="stat-pending">-</p>
-                    </div>
-                    <div class="glass-panel p-4 rounded-xl text-center shadow-sm">
-                        <p class="text-xs text-[#696868] font-bold uppercase">İşlenmiş</p>
-                        <p class="text-3xl font-bold mt-1 text-[#685d4a]" id="stat-processed">-</p>
+                    <div class="flex flex-wrap gap-2">
+                        <button onclick="toggleEditEventModal(true)" class="px-3 py-2 bg-white border border-[#cec5ba] hover:bg-[#f9f9f9] rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                            <span class="material-symbols-outlined text-[18px]">edit</span>
+                            Düzenle
+                        </button>
+                        <button onclick="handleArchiveEvent()" id="btn-archive-event" class="px-3 py-2 bg-white border border-[#cec5ba] hover:bg-[#f9f9f9] rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                            <span class="material-symbols-outlined text-[18px]">archive</span>
+                            <span id="txt-archive-event">Arşivle</span>
+                        </button>
+                        <button onclick="handleDeleteEvent()" class="px-3 py-2 bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                            <span class="material-symbols-outlined text-[18px]">delete</span>
+                            Sil
+                        </button>
                     </div>
                 </div>
 
-                <!-- Guest Link Panel -->
-                <div class="glass-panel p-6 rounded-2xl mb-8 flex flex-col md:flex-row items-center justify-between gap-4">
-                    <div class="flex-1 w-full">
-                        <h3 class="text-sm font-bold flex items-center gap-2 mb-2">
-                            <span class="material-symbols-outlined text-[#685d4a]">link</span> 
-                            Misafir Paylaşım Linki
+                <!-- Event Tabs -->
+                <div class="flex gap-4 border-b border-[#e2e2e2] mb-6">
+                    <button onclick="switchEventTab('overview')" id="event-tab-overview" class="py-2 px-1 border-b-2 border-[#685d4a] text-[#1a1c1c] font-bold text-sm">Genel Bakış</button>
+                    <button onclick="switchEventTab('gallery')" id="event-tab-gallery" class="py-2 px-1 border-b-2 border-transparent text-[#696868] hover:text-[#1a1c1c] font-medium text-sm transition-colors">Galeri (<span id="gallery-count">0</span>)</button>
+                </div>
+
+                <!-- Overview Section -->
+                <div id="event-overview-section">
+                    <!-- Event Stats -->
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+                        <div class="glass-panel p-4 rounded-xl text-center shadow-sm">
+                            <p class="text-xs text-[#696868] font-bold uppercase">Toplam Foto</p>
+                            <p class="text-3xl font-bold mt-1 text-[#685d4a]" id="stat-total">-</p>
+                        </div>
+                        <div class="glass-panel p-4 rounded-xl text-center shadow-sm">
+                            <p class="text-xs text-[#696868] font-bold uppercase">Bulunan Kişi</p>
+                            <p class="text-3xl font-bold mt-1 text-[#685d4a]" id="stat-people">-</p>
+                        </div>
+                        <div class="glass-panel p-4 rounded-xl text-center shadow-sm">
+                            <p class="text-xs text-[#696868] font-bold uppercase">Bekleyen</p>
+                            <p class="text-3xl font-bold mt-1 text-[#685d4a]" id="stat-pending">-</p>
+                        </div>
+                        <div class="glass-panel p-4 rounded-xl text-center shadow-sm">
+                            <p class="text-xs text-[#696868] font-bold uppercase">İşlenmiş</p>
+                            <p class="text-3xl font-bold mt-1 text-[#685d4a]" id="stat-processed">-</p>
+                        </div>
+                        <div class="glass-panel p-4 rounded-xl text-center shadow-sm bg-[#f0e0c8]/20 border-[#685d4a]/20">
+                            <p class="text-xs text-[#685d4a] font-bold uppercase">Bekleyen Sipariş</p>
+                            <p class="text-3xl font-bold mt-1 text-[#685d4a]" id="stat-orders">0</p>
+                        </div>
+                    </div>
+
+                    <!-- Guest Link Panel -->
+                    <div class="glass-panel p-6 rounded-2xl mb-8 flex flex-col md:flex-row items-center justify-between gap-4">
+                        <div class="flex-1 w-full">
+                            <h3 class="text-sm font-bold flex items-center gap-2 mb-2">
+                                <span class="material-symbols-outlined text-[#685d4a]">link</span> 
+                                Misafir Paylaşım Linki
+                            </h3>
+                            <div class="flex bg-white border border-[#e2e2e2] rounded-lg overflow-hidden">
+                                <input type="text" id="guest-link-input" class="w-full px-4 py-2 text-sm text-[#4b463d] bg-transparent outline-none" readonly>
+                                <button onclick="copyGuestLink()" class="px-4 py-2 bg-[#f3f3f4] hover:bg-[#e8e8e8] text-[#1a1c1c] font-medium text-sm transition-colors border-l border-[#e2e2e2]">Kopyala</button>
+                            </div>
+                        </div>
+                        <div class="flex gap-2 shrink-0">
+                            <button onclick="showQRCode()" class="h-10 px-4 rounded-lg bg-[#f0e0c8] text-[#685d4a] font-medium text-sm transition-colors hover:bg-[#e4d3ba] flex items-center gap-2">
+                                <span class="material-symbols-outlined text-[18px]">qr_code_2</span>
+                                QR Kod
+                            </button>
+                            <a id="guest-link-btn" href="#" target="_blank" class="h-10 px-4 rounded-lg bg-white border border-[#cec5ba] flex items-center gap-2 text-sm font-medium hover:bg-[#f9f9f9] transition-colors whitespace-nowrap">
+                                <span class="material-symbols-outlined text-[18px]">open_in_new</span>
+                                Aç
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Upload Panel -->
+                    <div class="bg-white rounded-3xl p-8 shadow-sm border border-[#e2e2e2]">
+                        <h3 class="text-lg font-bold flex items-center gap-2 mb-6">
+                            <span class="material-symbols-outlined text-[#685d4a]">cloud_upload</span> 
+                            Fotoğraf Yükle
                         </h3>
-                        <div class="flex bg-white border border-[#e2e2e2] rounded-lg overflow-hidden">
-                            <input type="text" id="guest-link-input" class="w-full px-4 py-2 text-sm text-[#4b463d] bg-transparent outline-none" readonly>
-                            <button onclick="copyGuestLink()" class="px-4 py-2 bg-[#f3f3f4] hover:bg-[#e8e8e8] text-[#1a1c1c] font-medium text-sm transition-colors border-l border-[#e2e2e2]">Kopyala</button>
+                        
+                        <div class="border-2 border-dashed border-[#cec5ba] rounded-2xl p-8 text-center hover:border-[#685d4a] hover:bg-[#f0e0c8]/20 transition-all cursor-pointer relative" id="drop-zone" onclick="document.getElementById('file-upload').click()">
+                            <input type="file" id="file-upload" class="hidden" multiple accept="image/jpeg, image/png, image/jpg" onchange="handleFileSelect(event)">
+                            <div class="w-16 h-16 rounded-full bg-[#f0e0c8] text-[#685d4a] mx-auto flex items-center justify-center mb-4">
+                                <span class="material-symbols-outlined text-3xl">add_photo_alternate</span>
+                            </div>
+                            <p class="font-medium text-[#1a1c1c]">Fotoğrafları seçmek için tıklayın</p>
+                            <p class="text-sm text-[#696868] mt-1">.jpg, .jpeg, .png</p>
+                            <p class="text-xs text-[#685d4a] font-bold mt-2" id="selected-files-count"></p>
                         </div>
-                    </div>
-                    <div class="flex gap-2 shrink-0">
-                        <button onclick="showQRCode()" class="h-10 px-4 rounded-lg bg-[#f0e0c8] text-[#685d4a] font-medium text-sm transition-colors hover:bg-[#e4d3ba] flex items-center gap-2">
-                            <span class="material-symbols-outlined text-[18px]">qr_code_2</span>
-                            QR Kod
-                        </button>
-                        <a id="guest-link-btn" href="#" target="_blank" class="h-10 px-4 rounded-lg bg-white border border-[#cec5ba] flex items-center gap-2 text-sm font-medium hover:bg-[#f9f9f9] transition-colors whitespace-nowrap">
-                            <span class="material-symbols-outlined text-[18px]">open_in_new</span>
-                            Aç
-                        </a>
+
+                        <div id="upload-progress-container" class="hidden mt-6">
+                            <div class="flex justify-between text-sm mb-2 font-medium">
+                                <span id="upload-status-text">Yükleniyor...</span>
+                                <span id="upload-percentage">0%</span>
+                            </div>
+                            <div class="w-full bg-[#eeeeee] rounded-full h-2.5 overflow-hidden">
+                                <div id="upload-progress-bar" class="bg-[#685d4a] h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+                            </div>
+                        </div>
+
+                        <div class="mt-6 flex justify-end gap-3" id="upload-controls">
+                            <button id="btn-pause" class="btn-outline py-3 px-6 rounded-xl font-medium hidden" onclick="pauseUpload()">
+                                Duraklat
+                            </button>
+                            <button id="btn-resume" class="btn-primary py-3 px-6 rounded-xl font-medium hidden" onclick="resumeUpload()">
+                                Devam Et
+                            </button>
+                            <button id="btn-upload" class="btn-primary py-3 px-6 rounded-xl font-medium hidden" onclick="startUpload()">
+                                Yüklemeyi Başlat
+                            </button>
+                        </div>
+
+                        <div id="ai-processing-alert" class="hidden mt-6 p-4 bg-[#e8f5e9] border border-[#c8e6c9] rounded-xl text-[#2e7d32] flex items-start gap-3">
+                            <span class="material-symbols-outlined animate-pulse">psychology</span>
+                            <div>
+                                <h4 class="font-bold text-sm">Yapay Zeka Analizi Başladı</h4>
+                                <p class="text-xs mt-1">Fotoğraflar yüklendi. Arka planda yüz tanıma ve kümeleme işlemi devam ediyor. Misafirleriniz birkaç dakika içinde sonuçları görebilir.</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Upload Panel -->
-                <div class="bg-white rounded-3xl p-8 shadow-sm border border-[#e2e2e2]">
-                    <h3 class="text-lg font-bold flex items-center gap-2 mb-6">
-                        <span class="material-symbols-outlined text-[#685d4a]">cloud_upload</span> 
-                        Fotoğraf Yükle
-                    </h3>
-                    
-                    <div class="border-2 border-dashed border-[#cec5ba] rounded-2xl p-8 text-center hover:border-[#685d4a] hover:bg-[#f0e0c8]/20 transition-all cursor-pointer relative" id="drop-zone" onclick="document.getElementById('file-upload').click()">
-                        <input type="file" id="file-upload" class="hidden" multiple accept="image/jpeg, image/png, image/jpg" onchange="handleFileSelect(event)">
-                        <div class="w-16 h-16 rounded-full bg-[#f0e0c8] text-[#685d4a] mx-auto flex items-center justify-center mb-4">
-                            <span class="material-symbols-outlined text-3xl">add_photo_alternate</span>
-                        </div>
-                        <p class="font-medium text-[#1a1c1c]">Fotoğrafları seçmek için tıklayın</p>
-                        <p class="text-sm text-[#696868] mt-1">.jpg, .jpeg, .png</p>
-                        <p class="text-xs text-[#685d4a] font-bold mt-2" id="selected-files-count"></p>
-                    </div>
-
-                    <div id="upload-progress-container" class="hidden mt-6">
-                        <div class="flex justify-between text-sm mb-2 font-medium">
-                            <span id="upload-status-text">Yükleniyor...</span>
-                            <span id="upload-percentage">0%</span>
-                        </div>
-                        <div class="w-full bg-[#eeeeee] rounded-full h-2.5 overflow-hidden">
-                            <div id="upload-progress-bar" class="bg-[#685d4a] h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
-                        </div>
-                    </div>
-
-                    <div class="mt-6 flex justify-end gap-3" id="upload-controls">
-                        <button id="btn-pause" class="btn-outline py-3 px-6 rounded-xl font-medium hidden" onclick="pauseUpload()">
-                            Duraklat
-                        </button>
-                        <button id="btn-resume" class="btn-primary py-3 px-6 rounded-xl font-medium hidden" onclick="resumeUpload()">
-                            Devam Et
-                        </button>
-                        <button id="btn-upload" class="btn-primary py-3 px-6 rounded-xl font-medium hidden" onclick="startUpload()">
-                            Yüklemeyi Başlat
+                <!-- Gallery Section -->
+                <div id="event-gallery-section" class="hidden">
+                    <div class="flex justify-between items-center mb-4">
+                        <p class="text-sm text-[#696868]">Yüklenen tüm fotoğrafları buradan görüntüleyebilir ve silebilirsiniz.</p>
+                        <button onclick="fetchEventPhotos()" class="text-sm text-[#685d4a] flex items-center gap-1 hover:underline font-medium">
+                            <span class="material-symbols-outlined text-[18px]">refresh</span> Yenile
                         </button>
                     </div>
-
-                    <div id="ai-processing-alert" class="hidden mt-6 p-4 bg-[#e8f5e9] border border-[#c8e6c9] rounded-xl text-[#2e7d32] flex items-start gap-3">
-                        <span class="material-symbols-outlined animate-pulse">psychology</span>
-                        <div>
-                            <h4 class="font-bold text-sm">Yapay Zeka Analizi Başladı</h4>
-                            <p class="text-xs mt-1">Fotoğraflar yüklendi. Arka planda yüz tanıma ve kümeleme işlemi devam ediyor. Misafirleriniz birkaç dakika içinde sonuçları görebilir.</p>
-                        </div>
+                    <div id="gallery-grid" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <!-- Photos will be appended here -->
                     </div>
+                    <div id="gallery-loading" class="text-center py-8 text-sm text-[#696868] hidden">Fotoğraflar yükleniyor...</div>
                 </div>
+
             </div>
 
             <!-- Orders Details -->
@@ -331,35 +418,120 @@
         </div>
     </div>
 
-    <!-- Settings Modal -->
-    <div id="settings-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center">
-        <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="toggleSettingsModal(false)"></div>
+    <!-- Edit Event Modal -->
+    <div id="edit-event-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="toggleEditEventModal(false)"></div>
         <div class="bg-white rounded-3xl p-8 w-full max-w-md relative z-10 shadow-2xl animate-fade-in-up">
             <div class="flex justify-between items-center mb-6">
-                <h2 class="text-xl font-bold">Stüdyo Ayarları</h2>
-                <button onclick="toggleSettingsModal(false)" class="text-[#696868] hover:text-[#1a1c1c]"><span class="material-symbols-outlined">close</span></button>
+                <h2 class="text-xl font-bold">Etkinliği Düzenle</h2>
+                <button onclick="toggleEditEventModal(false)" class="text-[#696868] hover:text-[#1a1c1c]"><span class="material-symbols-outlined">close</span></button>
             </div>
-            <form id="settings-form" onsubmit="handleUpdateSettings(event)" class="flex flex-col gap-4">
+            <form onsubmit="handleSaveEditEvent(event)" class="flex flex-col gap-4">
                 <div>
-                    <label class="block text-xs font-semibold text-[#4b463d] mb-1">Tema Rengi (HEX)</label>
-                    <div class="flex gap-2">
-                        <input type="color" id="settings-color-picker" class="h-11 rounded cursor-pointer border border-[#cec5ba]">
-                        <input type="text" id="settings-color" class="input-field flex-1 uppercase" placeholder="#685d4a">
-                    </div>
+                    <label class="block text-xs font-semibold text-[#4b463d] mb-1">Etkinlik Adı</label>
+                    <input type="text" id="edit-event-title" class="input-field" required>
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-[#4b463d] mb-1">Logo URL (Boş bırakılabilir)</label>
-                    <input type="url" id="settings-logo" class="input-field" placeholder="https://site.com/logo.png">
+                    <label class="block text-xs font-semibold text-[#4b463d] mb-1">Tarih</label>
+                    <input type="date" id="edit-event-date" class="input-field" required>
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-[#4b463d] mb-1">Filigran Metni (Boş bırakılabilir)</label>
-                    <input type="text" id="settings-watermark" class="input-field" placeholder="© 2024 Stüdyo Adı">
+                    <label class="block text-xs font-semibold text-[#4b463d] mb-1">Fotoğraf Fiyatı (TL)</label>
+                    <input type="number" id="edit-event-price" class="input-field" min="0" step="1" required>
                 </div>
                 <button type="submit" class="btn-primary w-full py-3 rounded-xl font-medium mt-4 flex items-center justify-center gap-2">
-                    <span id="settings-spinner" class="spinner hidden"></span>
+                    <span id="edit-event-spinner" class="spinner hidden"></span>
                     Kaydet
                 </button>
             </form>
+        </div>
+    </div>
+
+    <!-- Order Details Modal -->
+    <div id="order-details-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="document.getElementById('order-details-modal').classList.add('hidden')"></div>
+        <div class="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col relative z-10 shadow-2xl animate-fade-in-up">
+            <div class="p-6 border-b border-[#e2e2e2] flex justify-between items-center shrink-0">
+                <div>
+                    <h2 class="text-xl font-bold">Sipariş Detayı</h2>
+                    <p class="text-sm text-[#696868]" id="order-detail-guest">Misafir Adı</p>
+                </div>
+                <button onclick="document.getElementById('order-details-modal').classList.add('hidden')" class="text-[#696868] hover:text-[#1a1c1c]"><span class="material-symbols-outlined">close</span></button>
+            </div>
+            <div class="p-6 flex-1 overflow-y-auto bg-[#f9f9f9]">
+                <h3 class="text-sm font-bold mb-4">Seçilen Fotoğraflar (<span id="order-photo-count">0</span>)</h3>
+                <div id="order-photos-grid" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <!-- Order Photos -->
+                </div>
+                <div id="order-photos-loading" class="text-center py-8 text-sm text-[#696868] hidden">Yükleniyor...</div>
+            </div>
+            <div class="p-6 border-t border-[#e2e2e2] bg-white rounded-b-3xl shrink-0 flex justify-end">
+                <button onclick="document.getElementById('order-details-modal').classList.add('hidden')" class="btn-outline px-6 py-2 rounded-xl font-medium">Kapat</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="toggleSettingsModal(false)"></div>
+        <div class="bg-white rounded-3xl w-full max-w-2xl max-h-[95vh] flex flex-col relative z-10 shadow-2xl animate-fade-in-up">
+            <div class="p-6 border-b border-[#e2e2e2] flex justify-between items-center shrink-0">
+                <h2 class="text-xl font-bold">Stüdyo Ayarları</h2>
+                <button onclick="toggleSettingsModal(false)" class="text-[#696868] hover:text-[#1a1c1c]"><span class="material-symbols-outlined">close</span></button>
+            </div>
+            <div class="p-6 flex-1 overflow-y-auto">
+                <form id="settings-form" onsubmit="handleUpdateSettings(event)" class="flex flex-col gap-6">
+                    <div>
+                        <label class="block text-xs font-semibold text-[#4b463d] mb-1">Tema Rengi (HEX)</label>
+                        <div class="flex gap-2">
+                            <input type="color" id="settings-color-picker" class="h-11 rounded cursor-pointer border border-[#cec5ba]">
+                            <input type="text" id="settings-color" class="input-field flex-1 uppercase" placeholder="#685d4a">
+                        </div>
+                    </div>
+                    
+                    <div class="border-t border-[#e2e2e2] pt-4">
+                        <h3 class="text-sm font-bold mb-4">Gelişmiş Filigran Ayarları</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-[#4b463d] mb-1">Logo URL (Boş bırakılabilir)</label>
+                                <input type="url" id="settings-logo" class="input-field" placeholder="https://site.com/logo.png" onchange="updateWatermarkPreview()">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-[#4b463d] mb-1">Filigran Metni (Logo yoksa kullanılır)</label>
+                                <input type="text" id="settings-watermark" class="input-field" placeholder="© 2024 Stüdyo Adı" oninput="updateWatermarkPreview()">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 bg-[#f9f9f9] p-4 rounded-xl border border-[#e2e2e2] mb-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-[#4b463d] mb-2 flex justify-between">Opaklık <span id="val-opacity">0.6</span></label>
+                                <input type="range" id="settings-opacity" min="0.1" max="1" step="0.1" value="0.6" class="w-full accent-[#685d4a]" oninput="document.getElementById('val-opacity').textContent=this.value; updateWatermarkPreview()">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-[#4b463d] mb-2 flex justify-between">Boyut <span id="val-size">0.05</span></label>
+                                <input type="range" id="settings-size" min="0.01" max="0.5" step="0.01" value="0.05" class="w-full accent-[#685d4a]" oninput="document.getElementById('val-size').textContent=this.value; updateWatermarkPreview()">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-[#4b463d] mb-2 flex justify-between">Eğim (Derece) <span id="val-angle">0°</span></label>
+                                <input type="range" id="settings-angle" min="-90" max="90" step="1" value="0" class="w-full accent-[#685d4a]" oninput="document.getElementById('val-angle').textContent=this.value+'°'; updateWatermarkPreview()">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-[#4b463d] mb-2">Canlı Önizleme</label>
+                            <div class="relative w-full aspect-video bg-gray-200 rounded-lg overflow-hidden border border-[#cec5ba] flex items-center justify-center">
+                                <canvas id="watermark-preview-canvas" class="w-full h-full object-contain"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="p-6 border-t border-[#e2e2e2] bg-white rounded-b-3xl shrink-0">
+                <button form="settings-form" type="submit" class="btn-primary w-full py-3 rounded-xl font-medium flex items-center justify-center gap-2">
+                    <span id="settings-spinner" class="spinner hidden"></span>
+                    Ayarları Kaydet
+                </button>
+            </div>
         </div>
     </div>
 
@@ -378,9 +550,5 @@
 
     <script src="/config.js"></script>
     <script src="/studio.js"></script>
-    <style>
-        .animate-fade-in-up { animation: fadeInUp 0.3s ease-out forwards; }
-        @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-    </style>
 </body>
 </html>

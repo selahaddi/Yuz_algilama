@@ -13,6 +13,8 @@ const sidebarStudioName = document.getElementById('sidebar-studio-name');
 const sidebarStudioEmail = document.getElementById('sidebar-studio-email');
 const eventList = document.getElementById('event-list');
 const newEventModal = document.getElementById('new-event-modal');
+const editEventModal = document.getElementById('edit-event-modal');
+const orderDetailsModal = document.getElementById('order-details-modal');
 
 const emptyState = document.getElementById('empty-state');
 const eventDetails = document.getElementById('event-details');
@@ -20,6 +22,7 @@ const detailTitle = document.getElementById('detail-title');
 const detailDate = document.getElementById('detail-date');
 const guestLinkInput = document.getElementById('guest-link-input');
 const guestLinkBtn = document.getElementById('guest-link-btn');
+const detailStatus = document.getElementById('detail-status');
 
 const statTotal = document.getElementById('stat-total');
 const statPeople = document.getElementById('stat-people');
@@ -41,6 +44,7 @@ let currentUser = null;
 let currentStudioId = null;
 let currentStudioSettings = {};
 let currentEvent = null;
+let currentEventFilter = 'active';
 let selectedFiles = [];
 let uploadQueue = [];
 let isUploadPaused = false;
@@ -77,7 +81,7 @@ function showApp() {
     authView.classList.add('hidden');
     appView.classList.remove('hidden');
     if (typeof switchTab === 'function') {
-        switchTab('events');
+        switchTab('dashboard');
     }
 }
 
@@ -116,6 +120,17 @@ function toggleNewEventModal(show) {
         newEventModal.classList.add('hidden');
         document.getElementById('new-event-title').value = '';
         document.getElementById('new-event-date').value = '';
+    }
+}
+
+function toggleEditEventModal(show) {
+    if (show && currentEvent) {
+        document.getElementById('edit-event-title').value = currentEvent.title;
+        document.getElementById('edit-event-date').value = currentEvent.event_date;
+        document.getElementById('edit-event-price').value = currentEvent.price_per_photo || 0;
+        editEventModal.classList.remove('hidden');
+    } else {
+        editEventModal.classList.add('hidden');
     }
 }
 
@@ -186,15 +201,31 @@ async function handleUserLogin(user) {
     sidebarStudioEmail.textContent = user.email;
     
     showApp();
-    loadEvents();
+    loadEvents('active');
+    fetchDashboardStats();
 }
 
 // Events
-async function loadEvents() {
+window.loadEvents = async function(status = 'active') {
+    currentEventFilter = status;
+    
+    // UI Update for filters
+    const btnActive = document.getElementById('filter-active');
+    const btnArchived = document.getElementById('filter-archived');
+    
+    if(status === 'active') {
+        btnActive.className = "text-xs font-bold text-[#685d4a]";
+        btnArchived.className = "text-xs text-[#696868] hover:text-[#685d4a]";
+    } else {
+        btnArchived.className = "text-xs font-bold text-[#685d4a]";
+        btnActive.className = "text-xs text-[#696868] hover:text-[#685d4a]";
+    }
+
     const { data: events, error } = await supabaseClient
         .from('events')
         .select('*')
         .eq('studio_id', currentStudioId)
+        .eq('status', status)
         .order('created_at', { ascending: false });
 
     if (error) {
@@ -205,13 +236,18 @@ async function loadEvents() {
     eventList.innerHTML = '';
     
     if (events.length === 0) {
-        eventList.innerHTML = '<p class="text-xs text-[#696868] px-2">Henüz etkinlik oluşturmadınız.</p>';
+        eventList.innerHTML = `<p class="text-xs text-[#696868] px-2">Henüz ${status === 'active' ? 'aktif' : 'arşivlenmiş'} etkinlik yok.</p>`;
     } else {
         events.forEach(ev => {
             const btn = document.createElement('button');
             btn.className = 'w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition-colors hover:bg-[#f3f3f4] text-[#4b463d] truncate';
             btn.textContent = ev.title;
             btn.onclick = () => selectEvent(ev, btn);
+            // Highlight if current
+            if (currentEvent && currentEvent.id === ev.id) {
+                btn.classList.add('bg-[#f0e0c8]', 'text-[#1a1c1c]', 'font-bold');
+                btn.classList.remove('text-[#4b463d]', 'font-medium');
+            }
             eventList.appendChild(btn);
         });
     }
@@ -228,7 +264,8 @@ window.handleCreateEvent = async function(e) {
         studio_id: currentStudioId,
         title: title,
         event_date: date,
-        price_per_photo: price
+        price_per_photo: price,
+        status: 'active'
     }]).select();
     document.getElementById('create-event-spinner').classList.add('hidden');
     
@@ -236,8 +273,39 @@ window.handleCreateEvent = async function(e) {
         alert("Oluşturulamadı: " + error.message);
     } else {
         toggleNewEventModal(false);
-        await loadEvents();
+        await loadEvents('active');
+        switchTab('events');
         selectEvent(data[0]);
+        fetchDashboardStats();
+    }
+}
+
+window.handleSaveEditEvent = async function(e) {
+    e.preventDefault();
+    if (!currentEvent) return;
+    
+    const title = document.getElementById('edit-event-title').value;
+    const date = document.getElementById('edit-event-date').value;
+    const price = parseFloat(document.getElementById('edit-event-price').value) || 0;
+    
+    document.getElementById('edit-event-spinner').classList.remove('hidden');
+    const { error } = await supabaseClient.from('events').update({
+        title: title,
+        event_date: date,
+        price_per_photo: price
+    }).eq('id', currentEvent.id);
+    document.getElementById('edit-event-spinner').classList.add('hidden');
+    
+    if (error) {
+        alert("Güncellenemedi: " + error.message);
+    } else {
+        toggleEditEventModal(false);
+        currentEvent.title = title;
+        currentEvent.event_date = date;
+        currentEvent.price_per_photo = price;
+        detailTitle.textContent = title;
+        detailDate.textContent = new Date(date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
+        await loadEvents(currentEventFilter);
     }
 }
 
@@ -247,6 +315,7 @@ function selectEvent(ev, btnElement = null) {
     eventDetails.classList.remove('hidden');
     
     loadEventStats(ev.id);
+    switchEventTab('overview');
     
     // Highlight sidebar button
     document.querySelectorAll('#event-list button').forEach(b => {
@@ -261,8 +330,16 @@ function selectEvent(ev, btnElement = null) {
     detailTitle.textContent = ev.title;
     detailDate.textContent = new Date(ev.event_date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
     
-    // Guest Link (config.js'den gelen FRONTEND_URL kullanılır)
-    // Böylece stüdyoya Vercel üzerinden veya localhost'tan girilmesi fark etmeksizin doğru paylaşım linki üretilir.
+    if (ev.status === 'archived') {
+        detailStatus.textContent = 'Arşivlendi';
+        detailStatus.className = 'mt-2 inline-block px-2 py-1 text-xs font-bold rounded-md bg-gray-100 text-gray-700';
+        document.getElementById('txt-archive-event').textContent = 'Aktif Yap';
+    } else {
+        detailStatus.textContent = 'Aktif';
+        detailStatus.className = 'mt-2 inline-block px-2 py-1 text-xs font-bold rounded-md bg-green-100 text-green-700';
+        document.getElementById('txt-archive-event').textContent = 'Arşivle';
+    }
+    
     const guestUrl = `${FRONTEND_URL}/?event_id=${ev.id}`;
     guestLinkInput.value = guestUrl;
     guestLinkBtn.href = guestUrl;
@@ -281,6 +358,27 @@ function selectEvent(ev, btnElement = null) {
     uploadProgressBar.style.width = '0%';
 }
 
+window.handleArchiveEvent = async function() {
+    if (!currentEvent) return;
+    const newStatus = currentEvent.status === 'active' ? 'archived' : 'active';
+    const actionText = newStatus === 'archived' ? 'arşivlemek' : 'aktif hale getirmek';
+    
+    if (!confirm(`Bu etkinliği ${actionText} istediğinize emin misiniz?`)) return;
+
+    try {
+        const { error } = await supabaseClient.from('events').update({ status: newStatus }).eq('id', currentEvent.id);
+        if (error) throw error;
+        
+        currentEvent = null;
+        emptyState.classList.remove('hidden');
+        eventDetails.classList.add('hidden');
+        await loadEvents(currentEventFilter);
+        fetchDashboardStats();
+    } catch (err) {
+        alert("İşlem başarısız: " + err.message);
+    }
+}
+
 window.copyGuestLink = function() {
     guestLinkInput.select();
     document.execCommand('copy');
@@ -294,36 +392,23 @@ window.handleDeleteEvent = async function() {
     if (!confirm(`"${currentEvent.title}" etkinliğini ve tüm fotoğraflarını silmek istediğinize emin misiniz? Bu işlem geri alınamaz.`)) return;
 
     try {
-        // Fotoğrafları al (storage'dan silmek için)
-        const { data: photos, error: fetchError } = await supabaseClient
-            .from('photos')
-            .select('image_url')
-            .eq('event_id', currentEvent.id);
-        
+        const { data: photos, error: fetchError } = await supabaseClient.from('photos').select('image_url').eq('event_id', currentEvent.id);
         if (fetchError) throw fetchError;
 
-        // Storage'dan dosyaları sil
         if (photos && photos.length > 0) {
             const filesToRemove = photos.map(p => {
                 const parts = p.image_url.split('/');
                 return parts[parts.length - 1];
             }).filter(Boolean);
 
-            // Chunk by 100 to avoid request too large errors if there are many photos
             for (let i = 0; i < filesToRemove.length; i += 100) {
                 const chunk = filesToRemove.slice(i, i + 100);
                 await supabaseClient.storage.from('wedding_photos').remove(chunk);
             }
         }
 
-        // DB'den fotoğrafları sil
         await supabaseClient.from('photos').delete().eq('event_id', currentEvent.id);
-        
-        // DB'den etkinliği sil
-        const { error: deleteError } = await supabaseClient
-            .from('events')
-            .delete()
-            .eq('id', currentEvent.id);
+        const { error: deleteError } = await supabaseClient.from('events').delete().eq('id', currentEvent.id);
         
         if (deleteError) throw deleteError;
 
@@ -331,11 +416,28 @@ window.handleDeleteEvent = async function() {
         currentEvent = null;
         emptyState.classList.remove('hidden');
         eventDetails.classList.add('hidden');
-        await loadEvents();
+        await loadEvents(currentEventFilter);
+        fetchDashboardStats();
         
     } catch (err) {
         console.error("Silme hatası:", err);
         alert("Silinirken bir hata oluştu: " + err.message);
+    }
+}
+
+// Event Tabs (Overview / Gallery)
+window.switchEventTab = function(tab) {
+    if(tab === 'overview') {
+        document.getElementById('event-tab-overview').className = "py-2 px-1 border-b-2 border-[#685d4a] text-[#1a1c1c] font-bold text-sm";
+        document.getElementById('event-tab-gallery').className = "py-2 px-1 border-b-2 border-transparent text-[#696868] hover:text-[#1a1c1c] font-medium text-sm transition-colors";
+        document.getElementById('event-overview-section').classList.remove('hidden');
+        document.getElementById('event-gallery-section').classList.add('hidden');
+    } else {
+        document.getElementById('event-tab-gallery').className = "py-2 px-1 border-b-2 border-[#685d4a] text-[#1a1c1c] font-bold text-sm";
+        document.getElementById('event-tab-overview').className = "py-2 px-1 border-b-2 border-transparent text-[#696868] hover:text-[#1a1c1c] font-medium text-sm transition-colors";
+        document.getElementById('event-gallery-section').classList.remove('hidden');
+        document.getElementById('event-overview-section').classList.add('hidden');
+        fetchEventPhotos();
     }
 }
 
@@ -346,10 +448,7 @@ async function loadEventStats(evId) {
     statPending.textContent = '...';
     statProcessed.textContent = '...';
 
-    const { data: photos, error } = await supabaseClient
-        .from('photos')
-        .select('processed')
-        .eq('event_id', evId);
+    const { data: photos, error } = await supabaseClient.from('photos').select('processed').eq('event_id', evId);
     
     if (!error && photos) {
         const processedCount = photos.filter(p => p.processed).length;
@@ -357,13 +456,10 @@ async function loadEventStats(evId) {
         statTotal.textContent = photos.length;
         statProcessed.textContent = processedCount;
         statPending.textContent = pendingCount;
+        document.getElementById('gallery-count').textContent = photos.length;
     }
 
-    const { data: orders, error: orderError } = await supabaseClient
-        .from('orders')
-        .select('*')
-        .eq('event_id', evId)
-        .eq('status', 'pending');
+    const { data: orders, error: orderError } = await supabaseClient.from('orders').select('*').eq('event_id', evId).eq('status', 'pending');
     
     if (!orderError && orders) {
         document.getElementById('stat-orders').textContent = orders.length;
@@ -377,6 +473,61 @@ async function loadEventStats(evId) {
         statPeople.textContent = '?';
     }
 }
+
+// Event Gallery
+window.fetchEventPhotos = async function() {
+    if (!currentEvent) return;
+    const grid = document.getElementById('gallery-grid');
+    const loader = document.getElementById('gallery-loading');
+    
+    grid.innerHTML = '';
+    loader.classList.remove('hidden');
+
+    const { data: photos, error } = await supabaseClient.from('photos').select('*').eq('event_id', currentEvent.id).order('created_at', { ascending: false });
+    
+    loader.classList.add('hidden');
+    
+    if (error || !photos || photos.length === 0) {
+        grid.innerHTML = '<p class="col-span-full text-sm text-[#696868]">Henüz fotoğraf yüklenmemiş.</p>';
+        return;
+    }
+    
+    document.getElementById('gallery-count').textContent = photos.length;
+    
+    photos.forEach(photo => {
+        const div = document.createElement('div');
+        div.className = 'relative group aspect-square rounded-xl overflow-hidden bg-gray-200 border border-[#e2e2e2]';
+        div.innerHTML = `
+            <img src="${photo.thumbnail_url || photo.image_url}" class="w-full h-full object-cover">
+            <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
+                <button onclick="window.open('${photo.image_url}', '_blank')" class="bg-white text-[#1a1c1c] text-xs font-bold px-3 py-1 rounded hover:bg-[#f3f3f4]">Büyük Gör</button>
+                <button onclick="deletePhoto('${photo.id}', '${photo.image_url}')" class="bg-red-600 text-white text-xs font-bold px-3 py-1 rounded hover:bg-red-700 flex items-center gap-1">
+                    <span class="material-symbols-outlined text-[14px]">delete</span> Sil
+                </button>
+            </div>
+        `;
+        grid.appendChild(div);
+    });
+}
+
+window.deletePhoto = async function(photoId, imageUrl) {
+    if (!confirm("Bu fotoğrafı tamamen silmek istediğinize emin misiniz? (Sepetlerde varsa hata oluşturabilir)")) return;
+    
+    try {
+        const parts = imageUrl.split('/');
+        const filename = parts[parts.length - 1];
+        if (filename) {
+            await supabaseClient.storage.from('wedding_photos').remove([filename]);
+        }
+        await supabaseClient.from('photos').delete().eq('id', photoId);
+        
+        fetchEventPhotos();
+        loadEventStats(currentEvent.id);
+    } catch(err) {
+        alert("Fotoğraf silinemedi: " + err.message);
+    }
+}
+
 
 // File Uploads
 window.handleFileSelect = function(e) {
@@ -395,7 +546,6 @@ window.handleFileSelect = function(e) {
     }
 }
 
-// Drag and drop support
 dropZone.addEventListener('dragover', (e) => {
     e.preventDefault();
     dropZone.classList.add('border-[#685d4a]', 'bg-[#f0e0c8]/20');
@@ -413,13 +563,13 @@ dropZone.addEventListener('drop', (e) => {
     }
 });
 
-// Resize Image Utility
+// Advanced Watermark logic integrated in resizeImage
 function resizeImage(file, maxSize) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = (e) => {
             const img = new Image();
-            img.onload = () => {
+            img.onload = async () => {
                 let width = img.width;
                 let height = img.height;
 
@@ -441,19 +591,8 @@ function resizeImage(file, maxSize) {
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0, width, height);
 
-                // Add Watermark if set
-                if (currentStudioSettings && currentStudioSettings.watermark_text) {
-                    ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
-                    ctx.font = `${Math.floor(width * 0.05)}px sans-serif`;
-                    ctx.textAlign = "center";
-                    ctx.textBaseline = "middle";
-                    ctx.fillText(currentStudioSettings.watermark_text, width / 2, height / 2);
-                    
-                    // Add subtle shadow for visibility
-                    ctx.strokeStyle = "rgba(0, 0, 0, 0.3)";
-                    ctx.lineWidth = 2;
-                    ctx.strokeText(currentStudioSettings.watermark_text, width / 2, height / 2);
-                }
+                // Apply advanced watermark
+                await applyWatermarkToCanvas(ctx, width, height);
 
                 canvas.toBlob((blob) => {
                     resolve(new File([blob], file.name.replace(/\.[^/.]+$/, ".jpg"), {
@@ -468,6 +607,67 @@ function resizeImage(file, maxSize) {
         reader.onerror = reject;
         reader.readAsDataURL(file);
     });
+}
+
+// Function to apply watermark, used by both uploader and preview
+async function applyWatermarkToCanvas(ctx, width, height, settings = null) {
+    const s = settings || currentStudioSettings;
+    if (!s) return;
+
+    const opacity = s.watermark_opacity !== undefined ? parseFloat(s.watermark_opacity) : 0.6;
+    const sizeRatio = s.watermark_size !== undefined ? parseFloat(s.watermark_size) : 0.05;
+    const angleDegree = s.watermark_angle !== undefined ? parseFloat(s.watermark_angle) : 0;
+    
+    ctx.globalAlpha = opacity;
+    const angleRadian = angleDegree * Math.PI / 180;
+    
+    ctx.translate(width / 2, height / 2);
+    ctx.rotate(angleRadian);
+
+    if (s.logo_url && s.logo_url.trim() !== '') {
+        try {
+            const logo = new Image();
+            logo.crossOrigin = "anonymous";
+            await new Promise((res, rej) => {
+                logo.onload = res;
+                logo.onerror = rej;
+                logo.src = s.logo_url;
+            });
+            // Fit logo width to sizeRatio * canvas width
+            const logoWidth = width * (sizeRatio * 5); // multiplier to make slider feel right
+            const logoHeight = logo.height * (logoWidth / logo.width);
+            ctx.drawImage(logo, -logoWidth / 2, -logoHeight / 2, logoWidth, logoHeight);
+        } catch (e) {
+            console.error("Logo load error", e);
+            drawTextWatermark(ctx, width, s.watermark_text || "Stüdyo", sizeRatio);
+        }
+    } else if (s.watermark_text && s.watermark_text.trim() !== '') {
+        drawTextWatermark(ctx, width, s.watermark_text, sizeRatio);
+    }
+
+    ctx.rotate(-angleRadian);
+    ctx.translate(-width / 2, -height / 2);
+    ctx.globalAlpha = 1.0;
+}
+
+function drawTextWatermark(ctx, width, text, sizeRatio) {
+    const fontSize = Math.max(12, Math.floor(width * sizeRatio * 2)); // multiplier for text
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `bold ${fontSize}px sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    
+    ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetX = 2;
+    ctx.shadowOffsetY = 2;
+    
+    ctx.fillText(text, 0, 0);
+    
+    ctx.shadowColor = "transparent";
+    ctx.strokeStyle = "rgba(0,0,0,0.3)";
+    ctx.lineWidth = Math.max(1, fontSize / 20);
+    ctx.strokeText(text, 0, 0);
 }
 
 window.startUpload = async function() {
@@ -507,23 +707,16 @@ async function processUploadQueue() {
         uploadProgressBar.style.width = `${percent}%`;
 
         try {
-            // Filigranlı thumbnail
             const thumbnailFile = await resizeImage(file, 1024);
             const fileName = `${crypto.randomUUID()}`;
             
-            // Thumbnail Yükle
             await supabaseClient.storage.from('wedding_photos').upload(`${fileName}_thumb.jpg`, thumbnailFile);
             const { data: thumbData } = supabaseClient.storage.from('wedding_photos').getPublicUrl(`${fileName}_thumb.jpg`);
             
-            // Orijinal Yükle (Eğer e-ticaret/orijinal isteniyorsa) - Hız için sadece 1920px
-            const originalSizedFile = await resizeImage(file, 1920); // Filigransız
-            // Hack: resizeImage şu an filigran basıyor. Gerçekte orijinalini bozmamak lazım. 
-            // Şimdilik sadece thumbnail yükleyip aynı URL'i kullanalım basitleştirmek için.
-            
             const { error: dbError } = await supabaseClient.from('photos').insert([{
                 event_id: currentEvent.id,
-                image_url: thumbData.publicUrl, // Normalde burası orijinal olur
-                thumbnail_url: thumbData.publicUrl // Burası filigranlı olur
+                image_url: thumbData.publicUrl, 
+                thumbnail_url: thumbData.publicUrl 
             }]);
             
             if (dbError) throw dbError;
@@ -539,11 +732,10 @@ async function processUploadQueue() {
         uploadProgressBar.style.width = `100%`;
         uploadStatusText.textContent = `✅ ${totalFiles} fotoğraf yüklendi!`;
         document.getElementById('btn-pause').classList.add('hidden');
-
-        // İstatistikleri güncelle
-        loadEventStats(currentEvent.id);
-
-        // Trigger Worker via Guest API
+        
+        if(currentEvent) loadEventStats(currentEvent.id);
+        if(document.getElementById('event-gallery-section').classList.contains('hidden') === false) fetchEventPhotos();
+        
         triggerWorker();
     }
 }
@@ -566,6 +758,15 @@ window.toggleSettingsModal = function(show) {
         document.getElementById('settings-color-picker').value = currentStudioSettings?.primary_color || '#685d4a';
         document.getElementById('settings-logo').value = currentStudioSettings?.logo_url || '';
         document.getElementById('settings-watermark').value = currentStudioSettings?.watermark_text || '';
+        document.getElementById('settings-opacity').value = currentStudioSettings?.watermark_opacity ?? 0.6;
+        document.getElementById('settings-size').value = currentStudioSettings?.watermark_size ?? 0.05;
+        document.getElementById('settings-angle').value = currentStudioSettings?.watermark_angle ?? 0;
+        
+        document.getElementById('val-opacity').textContent = document.getElementById('settings-opacity').value;
+        document.getElementById('val-size').textContent = document.getElementById('settings-size').value;
+        document.getElementById('val-angle').textContent = document.getElementById('settings-angle').value + '°';
+        
+        updateWatermarkPreview();
         modal.classList.remove('hidden');
     } else {
         modal.classList.add('hidden');
@@ -581,22 +782,57 @@ document.getElementById('settings-color').addEventListener('input', (e) => {
     }
 });
 
+window.updateWatermarkPreview = async function() {
+    const canvas = document.getElementById('watermark-preview-canvas');
+    if(!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+    
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Create temporary settings object
+    const tempSettings = {
+        logo_url: document.getElementById('settings-logo').value,
+        watermark_text: document.getElementById('settings-watermark').value,
+        watermark_opacity: document.getElementById('settings-opacity').value,
+        watermark_size: document.getElementById('settings-size').value,
+        watermark_angle: document.getElementById('settings-angle').value
+    };
+    
+    await applyWatermarkToCanvas(ctx, canvas.width, canvas.height, tempSettings);
+}
+
 window.handleUpdateSettings = async function(e) {
     e.preventDefault();
     const primary_color = document.getElementById('settings-color').value;
     const logo_url = document.getElementById('settings-logo').value;
     const watermark_text = document.getElementById('settings-watermark').value;
+    const watermark_opacity = parseFloat(document.getElementById('settings-opacity').value);
+    const watermark_size = parseFloat(document.getElementById('settings-size').value);
+    const watermark_angle = parseFloat(document.getElementById('settings-angle').value);
     
     document.getElementById('settings-spinner').classList.remove('hidden');
     const { error } = await supabaseClient.from('studios').update({
-        primary_color, logo_url, watermark_text
+        primary_color, 
+        logo_url, 
+        watermark_text,
+        watermark_opacity,
+        watermark_size,
+        watermark_angle
     }).eq('id', currentStudioId);
     document.getElementById('settings-spinner').classList.add('hidden');
     
     if (error) {
         alert("Ayarlar güncellenemedi: " + error.message);
     } else {
-        currentStudioSettings = { ...currentStudioSettings, primary_color, logo_url, watermark_text };
+        currentStudioSettings = { 
+            ...currentStudioSettings, 
+            primary_color, logo_url, watermark_text, 
+            watermark_opacity, watermark_size, watermark_angle 
+        };
         toggleSettingsModal(false);
         alert("Ayarlar kaydedildi.");
     }
@@ -607,7 +843,7 @@ window.showQRCode = function() {
     if(!currentEvent) return;
     const url = guestLinkInput.value;
     const container = document.getElementById('qrcode-container');
-    container.innerHTML = ''; // Temizle
+    container.innerHTML = ''; 
     
     qrCodeObj = new QRCode(container, {
         text: url,
@@ -633,18 +869,10 @@ window.downloadQRCode = function() {
     document.body.removeChild(a);
 }
 
-// Global scope bindings for HTML onClick events
-window.switchAuthTab = switchAuthTab;
-window.toggleNewEventModal = toggleNewEventModal;
-
-// Start
-init();
-
-// Tab Switch Logic
+// Global Tab Switch Logic
 window.switchTab = function(tabName) {
-    const tabs = ['events', 'orders', 'feedbacks'];
+    const tabs = ['dashboard', 'events', 'orders', 'feedbacks'];
     
-    // Reset all tabs UI
     tabs.forEach(tab => {
         const btn = document.getElementById(`tab-${tab}`);
         if(btn) {
@@ -652,20 +880,22 @@ window.switchTab = function(tabName) {
         }
     });
     
-    // Set active tab UI
     const activeBtn = document.getElementById(`tab-${tabName}`);
     if(activeBtn) {
         activeBtn.className = "flex items-center gap-3 px-3 py-2 rounded-lg bg-[#f0e0c8] text-[#685d4a] font-medium transition-colors";
     }
 
-    // Hide all sections
+    document.getElementById('dashboard-details').classList.add('hidden');
     document.getElementById('empty-state').classList.add('hidden');
     document.getElementById('event-details').classList.add('hidden');
     document.getElementById('orders-details').classList.add('hidden');
     document.getElementById('feedbacks-details').classList.add('hidden');
     document.getElementById('sidebar-events-section').classList.add('hidden');
 
-    if(tabName === 'events') {
+    if(tabName === 'dashboard') {
+        document.getElementById('dashboard-details').classList.remove('hidden');
+        fetchDashboardStats();
+    } else if(tabName === 'events') {
         document.getElementById('sidebar-events-section').classList.remove('hidden');
         if(currentEvent) {
             document.getElementById('event-details').classList.remove('hidden');
@@ -681,12 +911,62 @@ window.switchTab = function(tabName) {
     }
 }
 
+// Dashboard Logic
+async function fetchDashboardStats() {
+    if (!currentStudioId) return;
+    let totalRevenue = 0;
+    let activeEventsCount = 0;
+    let pendingOrdersCount = 0;
+    
+    const { data: events } = await supabaseClient.from('events').select('id, status').eq('studio_id', currentStudioId);
+    if (!events || events.length === 0) return;
+    
+    activeEventsCount = events.filter(e => e.status === 'active' || !e.status).length;
+    const eventIds = events.map(e => e.id);
+    
+    const { data: orders } = await supabaseClient.from('orders').select('*').in('event_id', eventIds).order('created_at', { ascending: false });
+    
+    if (orders) {
+        totalRevenue = orders.filter(o => o.status === 'completed').reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0);
+        pendingOrdersCount = orders.filter(o => o.status === 'pending').length;
+        
+        // Render recent 5 orders
+        const recentContainer = document.getElementById('dash-recent-orders');
+        const recentOrders = orders.slice(0, 5);
+        if (recentOrders.length > 0) {
+            recentContainer.innerHTML = recentOrders.map(o => `
+                <div class="flex justify-between items-center py-2 border-b border-[#e2e2e2] last:border-0">
+                    <div>
+                        <p class="font-bold text-sm">${o.guest_name}</p>
+                        <p class="text-xs text-[#696868]">${new Date(o.created_at).toLocaleDateString('tr-TR')}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="font-bold text-sm">${o.total_price} TL</p>
+                        <span class="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${o.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}">${o.status === 'completed' ? 'Tamamlandı' : 'Bekliyor'}</span>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            recentContainer.innerHTML = '<p class="text-sm text-[#696868]">Henüz sipariş yok.</p>';
+        }
+    }
+
+    document.getElementById('dash-total-revenue').textContent = totalRevenue.toLocaleString('tr-TR') + ' TL';
+    document.getElementById('dash-active-events').textContent = activeEventsCount;
+    document.getElementById('dash-pending-orders').textContent = pendingOrdersCount;
+    
+    if(pendingOrdersCount > 0) {
+        document.getElementById('notification-dot').classList.remove('hidden');
+    } else {
+        document.getElementById('notification-dot').classList.add('hidden');
+    }
+}
+
 // Fetch and Render Orders
 async function fetchOrders() {
     const container = document.getElementById('orders-list-container');
     container.innerHTML = '<p class="text-sm text-[#696868]">Yükleniyor...</p>';
     
-    // Get all events for this studio
     const { data: events } = await supabaseClient.from('events').select('id, title').eq('studio_id', currentStudioId);
     if(!events || events.length === 0) {
         container.innerHTML = '<p class="text-sm text-[#696868]">Henüz etkinlik bulunmuyor.</p>';
@@ -718,9 +998,12 @@ async function fetchOrders() {
                     <p class="text-sm text-[#4b463d]">Etkinlik: ${eventName} • ${dateStr}</p>
                     <p class="text-sm text-[#685d4a] font-medium mt-1">Seçilen Fotoğraf Sayısı: ${order.photo_ids ? order.photo_ids.length : 0}</p>
                 </div>
-                <div class="text-right flex flex-col items-end gap-2">
+                <div class="text-right flex flex-col items-end gap-2 shrink-0">
                     <p class="text-xl font-bold text-[#1a1c1c]">${order.total_price > 0 ? order.total_price + ' TL' : 'Ücretsiz'}</p>
-                    ${!isCompleted ? `<button onclick="completeOrder('${order.id}')" class="px-4 py-2 bg-[#685d4a] text-white rounded-lg text-sm font-medium hover:bg-opacity-90">Tamamlandı İşaretle</button>` : ''}
+                    <div class="flex gap-2">
+                        <button onclick="showOrderDetails('${order.id}', '${order.guest_name}')" class="px-3 py-2 bg-white border border-[#cec5ba] text-[#4b463d] rounded-lg text-sm font-medium hover:bg-[#f9f9f9]">Detayları Gör</button>
+                        ${!isCompleted ? `<button onclick="completeOrder('${order.id}')" class="px-3 py-2 bg-[#685d4a] text-white rounded-lg text-sm font-medium hover:bg-opacity-90">Tamamlandı</button>` : ''}
+                    </div>
                 </div>
             </div>
         `;
@@ -731,22 +1014,59 @@ async function fetchOrders() {
 window.completeOrder = async function(orderId) {
     if(!confirm("Siparişi tamamlandı olarak işaretlemek istediğinize emin misiniz?")) return;
     await supabaseClient.from('orders').update({status: 'completed'}).eq('id', orderId);
-    fetchOrders(); // Refresh
+    fetchOrders(); 
+    fetchDashboardStats();
 }
+
+// Show Order Details Modal
+window.showOrderDetails = async function(orderId, guestName) {
+    const modal = document.getElementById('order-details-modal');
+    document.getElementById('order-detail-guest').textContent = guestName;
+    const grid = document.getElementById('order-photos-grid');
+    const loader = document.getElementById('order-photos-loading');
+    
+    grid.innerHTML = '';
+    loader.classList.remove('hidden');
+    document.getElementById('order-photo-count').textContent = '...';
+    
+    modal.classList.remove('hidden');
+
+    const { data: order } = await supabaseClient.from('orders').select('photo_ids').eq('id', orderId).single();
+    if (!order || !order.photo_ids || order.photo_ids.length === 0) {
+        loader.classList.add('hidden');
+        grid.innerHTML = '<p class="col-span-full text-sm text-[#696868]">Fotoğraf bulunamadı.</p>';
+        document.getElementById('order-photo-count').textContent = '0';
+        return;
+    }
+
+    const { data: photos } = await supabaseClient.from('photos').select('id, thumbnail_url, image_url').in('id', order.photo_ids);
+    
+    loader.classList.add('hidden');
+    
+    if (photos) {
+        document.getElementById('order-photo-count').textContent = photos.length;
+        photos.forEach(photo => {
+            const div = document.createElement('div');
+            div.className = 'aspect-square rounded-lg overflow-hidden border border-[#e2e2e2] cursor-pointer hover:opacity-90 transition-opacity';
+            div.onclick = () => window.open(photo.image_url, '_blank');
+            div.innerHTML = `<img src="${photo.thumbnail_url || photo.image_url}" class="w-full h-full object-cover">`;
+            grid.appendChild(div);
+        });
+    }
+}
+
 
 // Fetch and Render Feedbacks
 async function fetchFeedbacks() {
     const container = document.getElementById('feedbacks-list-container');
     container.innerHTML = '<p class="text-sm text-[#696868]">Yükleniyor...</p>';
     
-    // Get all events for this studio
     const { data: events } = await supabaseClient.from('events').select('id, title').eq('studio_id', currentStudioId);
     if(!events || events.length === 0) return;
     const eventIds = events.map(e => e.id);
     const eventMap = {};
     events.forEach(e => eventMap[e.id] = e.title);
 
-    // Get all photos for these events to map feedbacks
     const { data: photos } = await supabaseClient.from('photos').select('id, event_id, thumbnail_url').in('event_id', eventIds);
     if(!photos || photos.length === 0) return;
     const photoIds = photos.map(p => p.id);
@@ -788,9 +1108,10 @@ async function fetchFeedbacks() {
 
 window.removeMatch = async function(faceId, feedbackId) {
     if(!confirm("Bu yüzün bu kişiyle (cluster) olan eşleşmesini iptal etmek istediğinize emin misiniz?")) return;
-    // Set cluster_id to -1 to remove from cluster
     await supabaseClient.from('faces').update({cluster_id: -1}).eq('id', faceId);
-    // Delete feedback so it doesn't show up again
     await supabaseClient.from('feedbacks').delete().eq('id', feedbackId);
-    fetchFeedbacks(); // Refresh
+    fetchFeedbacks(); 
 }
+
+// Start app
+init();

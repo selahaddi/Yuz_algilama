@@ -14,9 +14,9 @@ Sistem 3 ana parçadan oluşmaktadır:
 - **Teknoloji:** Saf HTML, JS, CSS, TailwindCSS ve Supabase JS SDK.
 - **Kritik Dosyalar:** 
   - `public/index.html` & `public/app.js` (Misafir Yüz Arama Arayüzü)
-  - `public/studio.html` & `public/studio.js` (Fotoğrafçı Yönetim Paneli)
+  - `public/studio.html` & `public/studio.js` (Fotoğrafçı Yönetim Paneli: Dashboard, Galeri, Sipariş Detayları, Etkinlik Durumları)
   - `public/config.js` (API ve Supabase Key ayarları)
-- **Önemli Kural:** Storage maliyetlerini düşürmek için fotoğraflar Supabase'e yüklenmeden önce **mutlaka tarayıcıda Canvas ile 1920px'e** küçültülür (`studio.js` -> `resizeImage`).
+- **Önemli Kural:** Storage maliyetlerini düşürmek için fotoğraflar Supabase'e yüklenmeden önce **mutlaka tarayıcıda Canvas ile 1920px'e** küçültülür. Ayrıca filigran (watermark) işlemleri de opacity, size ve angle hesaplamalarıyla bu aşamada Canvas üzerinde uygulanır (`studio.js` -> `resizeImage`).
 
 ### B. Backend API (Google Cloud Run)
 - **Konum:** Kök dizindeki `guest_api.py`
@@ -31,8 +31,8 @@ Sistem 3 ana parçadan oluşmaktadır:
 - **Yüz Eşikleri:** Uzaktaki yüzleri kaçırmamak için: `MIN_FACE_SIZE = 50`, `MIN_DET_SCORE = 0.70`, `MIN_BLUR_SCORE = 15.00`.
 
 ## 3. Veritabanı Yapısı (Supabase PostgreSQL)
-- **studios:** Kayıtlı fotoğrafçıları tutar.
-- **events:** Düğün/Etkinlik bilgilerini tutar.
+- **studios:** Kayıtlı fotoğrafçıları tutar. (Ek ayarlar: `watermark_opacity`, `watermark_size`, `watermark_angle` vb.)
+- **events:** Düğün/Etkinlik bilgilerini tutar. (Ek durum: `status` -> active/archived)
 - **photos:** Yüklenen etkinlik fotoğraflarının Storage URL'lerini tutar.
 - **faces:** Fotoğraflarda tespit edilen her bir yüzün embedding vektörünü (`vector(512)` pgvector) tutar. Yüz arama burada cosine distance ile yapılır.
 

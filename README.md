@@ -9,7 +9,9 @@ Sistem, yüklenen fotoğraflardaki yüzleri tespit eder, benzerliklerine göre o
 - **Gözetimsiz Öğrenme (DBSCAN) ve AI:** InsightFace (`buffalo_s`) modeli ile veri tabanına önceden kayıtlı yüze ihtiyaç duymadan yüz haritası çıkarımı.
 - **Bulut Mimarisi & Paralel İşleme:** Google Cloud Run üzerinde çalışan `FastAPI` (Guest API) ve arka planda `worker.py` (Cloud Run Job) ile 4'erli paralel işleme mimarisi (ThreadPool).
 - **İstemci Taraflı Optimizasyon:** HTML Canvas ile yüklenen fotoğraflar Vercel frontend tarafında tarayıcıda 1920px (FHD) boyutuna sıkıştırılır; Storage maliyetlerinden %90 tasarruf sağlanır.
-- **Sepet ve Sipariş Altyapısı:** Kullanıcılar buldukları fotoğrafları sepetlerine ekleyebilir ve stüdyonun belirlediği fiyattan online sipariş talebi oluşturabilirler (Siparişler `orders` tablosuna kaydedilir).
+- **Sepet ve Sipariş Altyapısı:** Kullanıcılar buldukları fotoğrafları sepetlerine ekleyebilir ve stüdyonun belirlediği fiyattan online sipariş talebi oluşturabilirler (Siparişler `orders` tablosuna kaydedilir). Stüdyolar bu siparişlerin detaylarını ve seçilen fotoğrafları panelden görebilir.
+- **Kapsamlı Stüdyo Yönetim Paneli:** Dashboard üzerinden istatistikler izlenebilir, etkinlikler arşivlenebilir ve galerideki fotoğraflar yönetilebilir.
+- **Gelişmiş Filigran (Watermark) Modülü:** Fotoğraflar yüklenirken stüdyonun belirlediği opaklık, büyüklük ve eğim değerlerine göre tarayıcı (Canvas) üzerinde filigran anlık olarak uygulanır.
 - **Gerçek Zamanlı Veritabanı:** Supabase PostgreSQL ve Storage ile anlık etkinlik/fotoğraf yönetimi.
 - **Otomatik Temizlik (Cost Saver):** `cleanup_events.py` scripti sayesinde 30 günü geçen eski etkinlikler Cloud Storage ve veritabanından otomatik silinir.
 
