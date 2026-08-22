@@ -51,12 +51,35 @@
 </div>
 </div>
 <script>
+        const GUEST_API_URL = 'https://guest-api-398389727192.europe-west4.run.app';
+
         document.addEventListener('DOMContentLoaded', () => {
             const checkbox = document.getElementById('consent-checkbox');
             const enterBtn = document.getElementById('enter-btn');
             
             const urlParams = new URLSearchParams(window.location.search);
             const eventId = urlParams.get('event_id');
+
+            if (eventId) {
+                // Fetch event details to show real title instead of template
+                fetch(GUEST_API_URL + '/api/event/' + eventId, {
+                    headers: { 'Bypass-Tunnel-Reminder': 'true' }
+                })
+                .then(res => {
+                    if (res.ok) return res.json();
+                    throw new Error('Event not found');
+                })
+                .then(data => {
+                    document.querySelector('.font-headline-md').innerText = data.title;
+                    if(data.event_date) {
+                        document.querySelector('.font-label-sm').innerText = data.event_date;
+                    }
+                    if (data.primary_color) {
+                        document.documentElement.style.setProperty('--primary', data.primary_color);
+                    }
+                })
+                .catch(err => console.error(err));
+            }
 
             checkbox.addEventListener('change', (e) => {
                 if (e.target.checked) {
