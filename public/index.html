@@ -358,7 +358,7 @@
         updateCartUI();
         
         // Update all cards with this photoId visually (across different tabs)
-        document.querySelectorAll(\`[data-photo-id="\${photoId}"]\`).forEach(card => {
+        document.querySelectorAll(`[data-photo-id="${photoId}"]`).forEach(card => {
             const isSelected = selectedCart.has(photoId);
             const overlay = card.querySelector('.selection-overlay');
             const checkbox = card.querySelector('.selection-checkbox');
