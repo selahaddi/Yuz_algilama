@@ -103,11 +103,28 @@
                 </div>
             </div>
             
-            <div class="p-4 flex-1 overflow-y-auto">
-                <h3 class="text-xs font-bold text-[#696868] uppercase tracking-wider mb-4 px-2">Etkinlikleriniz</h3>
-                
-                <div id="event-list" class="flex flex-col gap-1">
-                    <!-- Events will be populated here -->
+            <div class="p-4 flex-1 overflow-y-auto flex flex-col gap-4">
+                <!-- Navigation -->
+                <nav class="flex flex-col gap-1 mb-2">
+                    <button onclick="switchTab('events')" id="tab-events" class="flex items-center gap-3 px-3 py-2 rounded-lg bg-[#f0e0c8] text-[#685d4a] font-medium transition-colors">
+                        <span class="material-symbols-outlined text-[20px]">event</span>
+                        Etkinlikler
+                    </button>
+                    <button onclick="switchTab('orders')" id="tab-orders" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[#f3f3f4] text-[#696868] font-medium transition-colors">
+                        <span class="material-symbols-outlined text-[20px]">shopping_bag</span>
+                        Siparişler
+                    </button>
+                    <button onclick="switchTab('feedbacks')" id="tab-feedbacks" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[#f3f3f4] text-[#696868] font-medium transition-colors">
+                        <span class="material-symbols-outlined text-[20px]">report</span>
+                        Geri Bildirimler
+                    </button>
+                </nav>
+
+                <div id="sidebar-events-section">
+                    <h3 class="text-xs font-bold text-[#696868] uppercase tracking-wider mb-4 px-2">Etkinlikleriniz</h3>
+                    <div id="event-list" class="flex flex-col gap-1">
+                        <!-- Events will be populated here -->
+                    </div>
                 </div>
             </div>
 
@@ -249,6 +266,36 @@
                             <h4 class="font-bold text-sm">Yapay Zeka Analizi Başladı</h4>
                             <p class="text-xs mt-1">Fotoğraflar yüklendi. Arka planda yüz tanıma ve kümeleme işlemi devam ediyor. Misafirleriniz birkaç dakika içinde sonuçları görebilir.</p>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Orders Details -->
+            <div id="orders-details" class="hidden max-w-5xl mx-auto p-8 pt-12 pb-24">
+                <div class="flex justify-between items-end mb-8">
+                    <div>
+                        <span class="text-xs font-bold text-[#685d4a] uppercase tracking-widest">Yönetim</span>
+                        <h1 class="text-4xl font-bold mt-1 text-[#1a1c1c] tracking-tight">Siparişler</h1>
+                    </div>
+                </div>
+                <div class="bg-white rounded-3xl p-6 shadow-sm border border-[#e2e2e2]">
+                    <div id="orders-list-container" class="flex flex-col gap-4">
+                        <!-- Orders will be populated here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Feedbacks Details -->
+            <div id="feedbacks-details" class="hidden max-w-5xl mx-auto p-8 pt-12 pb-24">
+                <div class="flex justify-between items-end mb-8">
+                    <div>
+                        <span class="text-xs font-bold text-[#685d4a] uppercase tracking-widest">Yönetim</span>
+                        <h1 class="text-4xl font-bold mt-1 text-[#1a1c1c] tracking-tight">Geri Bildirimler (Hatalı Eşleşmeler)</h1>
+                    </div>
+                </div>
+                <div class="bg-white rounded-3xl p-6 shadow-sm border border-[#e2e2e2]">
+                    <div id="feedbacks-list-container" class="flex flex-col gap-4">
+                        <!-- Feedbacks will be populated here -->
                     </div>
                 </div>
             </div>

@@ -76,6 +76,9 @@ function showAuth() {
 function showApp() {
     authView.classList.add('hidden');
     appView.classList.remove('hidden');
+    if (typeof switchTab === 'function') {
+        switchTab('events');
+    }
 }
 
 function switchAuthTab(tab) {
@@ -636,3 +639,158 @@ window.toggleNewEventModal = toggleNewEventModal;
 
 // Start
 init();
+
+// Tab Switch Logic
+window.switchTab = function(tabName) {
+    const tabs = ['events', 'orders', 'feedbacks'];
+    
+    // Reset all tabs UI
+    tabs.forEach(tab => {
+        const btn = document.getElementById(`tab-${tab}`);
+        if(btn) {
+            btn.className = "flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[#f3f3f4] text-[#696868] font-medium transition-colors";
+        }
+    });
+    
+    // Set active tab UI
+    const activeBtn = document.getElementById(`tab-${tabName}`);
+    if(activeBtn) {
+        activeBtn.className = "flex items-center gap-3 px-3 py-2 rounded-lg bg-[#f0e0c8] text-[#685d4a] font-medium transition-colors";
+    }
+
+    // Hide all sections
+    document.getElementById('empty-state').classList.add('hidden');
+    document.getElementById('event-details').classList.add('hidden');
+    document.getElementById('orders-details').classList.add('hidden');
+    document.getElementById('feedbacks-details').classList.add('hidden');
+    document.getElementById('sidebar-events-section').classList.add('hidden');
+
+    if(tabName === 'events') {
+        document.getElementById('sidebar-events-section').classList.remove('hidden');
+        if(currentEvent) {
+            document.getElementById('event-details').classList.remove('hidden');
+        } else {
+            document.getElementById('empty-state').classList.remove('hidden');
+        }
+    } else if(tabName === 'orders') {
+        document.getElementById('orders-details').classList.remove('hidden');
+        fetchOrders();
+    } else if(tabName === 'feedbacks') {
+        document.getElementById('feedbacks-details').classList.remove('hidden');
+        fetchFeedbacks();
+    }
+}
+
+// Fetch and Render Orders
+async function fetchOrders() {
+    const container = document.getElementById('orders-list-container');
+    container.innerHTML = '<p class="text-sm text-[#696868]">Yükleniyor...</p>';
+    
+    // Get all events for this studio
+    const { data: events } = await supabaseClient.from('events').select('id, title').eq('studio_id', currentStudioId);
+    if(!events || events.length === 0) {
+        container.innerHTML = '<p class="text-sm text-[#696868]">Henüz etkinlik bulunmuyor.</p>';
+        return;
+    }
+    const eventIds = events.map(e => e.id);
+    const eventMap = {};
+    events.forEach(e => eventMap[e.id] = e.title);
+
+    const { data: orders, error } = await supabaseClient.from('orders').select('*').in('event_id', eventIds).order('created_at', { ascending: false });
+    
+    if(error || !orders || orders.length === 0) {
+        container.innerHTML = '<p class="text-sm text-[#696868]">Henüz sipariş bulunmuyor.</p>';
+        return;
+    }
+
+    let html = '';
+    orders.forEach(order => {
+        const isCompleted = order.status === 'completed';
+        const eventName = eventMap[order.event_id] || "Bilinmeyen Etkinlik";
+        const dateStr = new Date(order.created_at).toLocaleString('tr-TR');
+        html += `
+            <div class="border border-[#e2e2e2] rounded-xl p-4 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between ${isCompleted ? 'bg-[#f9f9f9] opacity-70' : 'bg-white'}">
+                <div>
+                    <span class="text-xs font-bold px-2 py-1 rounded ${isCompleted ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'} uppercase tracking-wider mb-2 inline-block">
+                        ${isCompleted ? 'Tamamlandı' : 'Bekliyor'}
+                    </span>
+                    <h3 class="font-bold text-[#1a1c1c]">${order.guest_name} <span class="text-sm font-normal text-[#696868]">(${order.guest_contact})</span></h3>
+                    <p class="text-sm text-[#4b463d]">Etkinlik: ${eventName} • ${dateStr}</p>
+                    <p class="text-sm text-[#685d4a] font-medium mt-1">Seçilen Fotoğraf Sayısı: ${order.photo_ids ? order.photo_ids.length : 0}</p>
+                </div>
+                <div class="text-right flex flex-col items-end gap-2">
+                    <p class="text-xl font-bold text-[#1a1c1c]">${order.total_price > 0 ? order.total_price + ' TL' : 'Ücretsiz'}</p>
+                    ${!isCompleted ? `<button onclick="completeOrder('${order.id}')" class="px-4 py-2 bg-[#685d4a] text-white rounded-lg text-sm font-medium hover:bg-opacity-90">Tamamlandı İşaretle</button>` : ''}
+                </div>
+            </div>
+        `;
+    });
+    container.innerHTML = html;
+}
+
+window.completeOrder = async function(orderId) {
+    if(!confirm("Siparişi tamamlandı olarak işaretlemek istediğinize emin misiniz?")) return;
+    await supabaseClient.from('orders').update({status: 'completed'}).eq('id', orderId);
+    fetchOrders(); // Refresh
+}
+
+// Fetch and Render Feedbacks
+async function fetchFeedbacks() {
+    const container = document.getElementById('feedbacks-list-container');
+    container.innerHTML = '<p class="text-sm text-[#696868]">Yükleniyor...</p>';
+    
+    // Get all events for this studio
+    const { data: events } = await supabaseClient.from('events').select('id, title').eq('studio_id', currentStudioId);
+    if(!events || events.length === 0) return;
+    const eventIds = events.map(e => e.id);
+    const eventMap = {};
+    events.forEach(e => eventMap[e.id] = e.title);
+
+    // Get all photos for these events to map feedbacks
+    const { data: photos } = await supabaseClient.from('photos').select('id, event_id, thumbnail_url').in('event_id', eventIds);
+    if(!photos || photos.length === 0) return;
+    const photoIds = photos.map(p => p.id);
+    const photoMap = {};
+    photos.forEach(p => photoMap[p.id] = p);
+
+    const { data: feedbacks, error } = await supabaseClient.from('feedbacks').select('*').in('photo_id', photoIds).order('created_at', { ascending: false });
+    
+    if(error || !feedbacks || feedbacks.length === 0) {
+        container.innerHTML = '<p class="text-sm text-[#696868]">Bekleyen geri bildirim (hatalı eşleşme) bulunmuyor.</p>';
+        return;
+    }
+
+    let html = '';
+    feedbacks.forEach(fb => {
+        const photo = photoMap[fb.photo_id];
+        const eventName = photo ? (eventMap[photo.event_id] || "Bilinmeyen") : "Bilinmeyen";
+        const dateStr = new Date(fb.created_at).toLocaleString('tr-TR');
+        
+        html += `
+            <div class="border border-[#e2e2e2] rounded-xl p-4 flex gap-4 items-center bg-white">
+                <img src="${photo ? photo.thumbnail_url : ''}" class="w-20 h-20 object-cover rounded-lg bg-[#f3f3f4]">
+                <div class="flex-1">
+                    <span class="text-xs font-bold px-2 py-1 rounded bg-red-100 text-red-700 uppercase tracking-wider mb-2 inline-block">
+                        Hatalı Eşleşme Bildirimi
+                    </span>
+                    <p class="text-sm text-[#4b463d]">Etkinlik: ${eventName} • ${dateStr}</p>
+                </div>
+                <div>
+                    <button onclick="removeMatch('${fb.face_id}', '${fb.id}')" class="px-4 py-2 bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 rounded-lg text-sm font-medium transition-colors">
+                        Eşleşmeyi İptal Et
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+    container.innerHTML = html;
+}
+
+window.removeMatch = async function(faceId, feedbackId) {
+    if(!confirm("Bu yüzün bu kişiyle (cluster) olan eşleşmesini iptal etmek istediğinize emin misiniz?")) return;
+    // Set cluster_id to -1 to remove from cluster
+    await supabaseClient.from('faces').update({cluster_id: -1}).eq('id', faceId);
+    // Delete feedback so it doesn't show up again
+    await supabaseClient.from('feedbacks').delete().eq('id', feedbackId);
+    fetchFeedbacks(); // Refresh
+}

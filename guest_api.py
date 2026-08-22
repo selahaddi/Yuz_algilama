@@ -391,15 +391,22 @@ def create_order(order: OrderRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 class FeedbackRequest(BaseModel):
-    face_id: str
+    cluster_id: int
     photo_id: str
     status: str = "wrong_match"
 
 @app.post("/api/feedback")
 def submit_feedback(feedback: FeedbackRequest):
     try:
+        # Önce bu cluster ve photo için doğru face_id'yi bul
+        res_face = supabase.table("faces").select("id").eq("photo_id", feedback.photo_id).eq("cluster_id", feedback.cluster_id).execute()
+        if not res_face.data:
+            raise Exception("Yüz bulunamadı")
+        
+        face_id = res_face.data[0]["id"]
+        
         data = {
-            "face_id": feedback.face_id,
+            "face_id": face_id,
             "photo_id": feedback.photo_id,
             "status": feedback.status
         }
