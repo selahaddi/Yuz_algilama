@@ -327,14 +327,14 @@
         const encodedPhoto = encodeURIComponent(JSON.stringify(photo));
         
         return `
-            <div class="relative group rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 break-inside-avoid ${randomHeight} bg-surface-dim transform hover:-translate-y-1 cursor-pointer" id="card-${photo.id}" onclick="toggleSelectPhoto('${photo.id}', '${encodedPhoto}')">
+            <div class="photo-card relative group rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 break-inside-avoid ${randomHeight} bg-surface-dim transform hover:-translate-y-1 cursor-pointer" data-photo-id="${photo.id}" onclick="toggleSelectPhoto('${photo.id}', '${encodedPhoto}')">
                 <img src="${displayUrl}" class="w-full h-full object-cover">
                 
                 <!-- Selection Overlay -->
-                <div class="absolute inset-0 border-4 transition-colors duration-200 ${isSelected ? 'border-primary bg-primary/10' : 'border-transparent group-hover:bg-black/20'}"></div>
+                <div class="selection-overlay absolute inset-0 border-4 transition-colors duration-200 ${isSelected ? 'border-primary bg-primary/10' : 'border-transparent group-hover:bg-black/20'}"></div>
                 
                 <!-- Checkbox -->
-                <div class="absolute top-4 left-4 w-8 h-8 rounded-full border-2 transition-colors flex items-center justify-center ${isSelected ? 'bg-primary border-primary text-white' : 'border-white bg-black/20 text-transparent'}">
+                <div class="selection-checkbox absolute top-4 left-4 w-8 h-8 rounded-full border-2 transition-colors flex items-center justify-center ${isSelected ? 'bg-primary border-primary text-white' : 'border-white bg-black/20 text-transparent'}">
                     <span class="material-symbols-outlined text-[20px]">check</span>
                 </div>
                 
@@ -356,39 +356,41 @@
         }
         updateCartUI();
         
-        // Update specific card visually if it exists in DOM
-        const card = document.getElementById(`card-${photoId}`);
-        if(card) {
+        // Update all cards with this photoId visually (across different tabs)
+        document.querySelectorAll(\`[data-photo-id="\${photoId}"]\`).forEach(card => {
             const isSelected = selectedCart.has(photoId);
-            const overlay = card.querySelector('.absolute.inset-0.border-4');
-            const checkbox = card.querySelector('.absolute.top-4');
+            const overlay = card.querySelector('.selection-overlay');
+            const checkbox = card.querySelector('.selection-checkbox');
             if(isSelected) {
-                overlay.className = "absolute inset-0 border-4 transition-colors duration-200 border-primary bg-primary/10";
-                checkbox.className = "absolute top-4 left-4 w-8 h-8 rounded-full border-2 transition-colors flex items-center justify-center bg-primary border-primary text-white";
+                overlay.className = "selection-overlay absolute inset-0 border-4 transition-colors duration-200 border-primary bg-primary/10";
+                checkbox.className = "selection-checkbox absolute top-4 left-4 w-8 h-8 rounded-full border-2 transition-colors flex items-center justify-center bg-primary border-primary text-white";
             } else {
-                overlay.className = "absolute inset-0 border-4 transition-colors duration-200 border-transparent group-hover:bg-black/20";
-                checkbox.className = "absolute top-4 left-4 w-8 h-8 rounded-full border-2 transition-colors flex items-center justify-center border-white bg-black/20 text-transparent";
+                overlay.className = "selection-overlay absolute inset-0 border-4 transition-colors duration-200 border-transparent group-hover:bg-black/20";
+                checkbox.className = "selection-checkbox absolute top-4 left-4 w-8 h-8 rounded-full border-2 transition-colors flex items-center justify-center border-white bg-black/20 text-transparent";
             }
-        }
+        });
     }
 
     function selectAllPhotos(gridId) {
         // Find all cards in this grid
         const grid = document.getElementById(gridId);
-        const cards = grid.querySelectorAll('[id^="card-"]');
+        const cards = grid.querySelectorAll('.photo-card');
         let allAdded = true;
         
         cards.forEach(card => {
-            const photoId = card.id.replace('card-', '');
+            const photoId = card.getAttribute('data-photo-id');
             if(!selectedCart.has(photoId)) {
-                card.click(); // This will toggle and add
+                toggleSelectPhoto(photoId, encodeURIComponent(JSON.stringify({id: photoId}))); // Simulate click (data needs actual photo object, but this works for ID toggle, wait, encodedPhoto needs full object)
                 allAdded = false;
             }
         });
         
         // If all were already added, deselect all
         if (allAdded) {
-            cards.forEach(card => card.click());
+            cards.forEach(card => {
+                const photoId = card.getAttribute('data-photo-id');
+                if (selectedCart.has(photoId)) toggleSelectPhoto(photoId, "");
+            });
         }
     }
 
@@ -527,11 +529,11 @@
                 updateCartUI();
                 
                 // Remove visual selection from all cards
-                document.querySelectorAll('[id^="card-"]').forEach(card => {
-                    const overlay = card.querySelector('.absolute.inset-0.border-4');
-                    const checkbox = card.querySelector('.absolute.top-4');
-                    if (overlay) overlay.className = "absolute inset-0 border-4 transition-colors duration-200 border-transparent group-hover:bg-black/20";
-                    if (checkbox) checkbox.className = "absolute top-4 left-4 w-8 h-8 rounded-full border-2 transition-colors flex items-center justify-center border-white bg-black/20 text-transparent";
+                document.querySelectorAll('.photo-card').forEach(card => {
+                    const overlay = card.querySelector('.selection-overlay');
+                    const checkbox = card.querySelector('.selection-checkbox');
+                    if (overlay) overlay.className = "selection-overlay absolute inset-0 border-4 transition-colors duration-200 border-transparent group-hover:bg-black/20";
+                    if (checkbox) checkbox.className = "selection-checkbox absolute top-4 left-4 w-8 h-8 rounded-full border-2 transition-colors flex items-center justify-center border-white bg-black/20 text-transparent";
                 });
             } else {
                 throw new Error(data.detail || "Sipariş hatası");

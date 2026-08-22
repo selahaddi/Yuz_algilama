@@ -1,6 +1,6 @@
 {
   "cleanUrls": true,
   "rewrites": [
-    { "source": "/api/:path*", "destination": "https://guest-api-398389727192.europe-west1.run.app/api/:path*" }
+    { "source": "/api/:path*", "destination": "https://guest-api-398389727192.europe-west4.run.app/api/:path*" }
   ]
 }
