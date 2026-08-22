@@ -178,25 +178,25 @@
             }
             
             // White-label: Apply Studio Settings if available
-            if (data.studio) {
-                if (data.studio.primary_color) {
-                    document.documentElement.style.setProperty('--primary', data.studio.primary_color);
+            if (data.primary_color || data.logo_url) {
+                if (data.primary_color) {
+                    document.documentElement.style.setProperty('--primary', data.primary_color);
                     // Add tailwind arbitrary value override logic if possible, 
                     // or just rely on CSS overrides if we had CSS vars. 
                     // Since Tailwind is used statically with config script, we can modify config and re-parse (not trivial).
                     // As a workaround, we can inject a style tag to override .bg-primary etc.
                     const style = document.createElement('style');
                     style.innerHTML = `
-                        .bg-primary { background-color: ${data.studio.primary_color} !important; }
-                        .text-primary { color: ${data.studio.primary_color} !important; }
-                        .border-primary { border-color: ${data.studio.primary_color} !important; }
-                        .border-t-primary { border-top-color: ${data.studio.primary_color} !important; }
+                        .bg-primary { background-color: ${data.primary_color} !important; }
+                        .text-primary { color: ${data.primary_color} !important; }
+                        .border-primary { border-color: ${data.primary_color} !important; }
+                        .border-t-primary { border-top-color: ${data.primary_color} !important; }
                     `;
                     document.head.appendChild(style);
                 }
-                if (data.studio.logo_url) {
+                if (data.logo_url) {
                     const logoEl = document.getElementById('header-logo');
-                    logoEl.src = data.studio.logo_url;
+                    logoEl.src = data.logo_url;
                     logoEl.classList.remove('hidden');
                 }
             }
