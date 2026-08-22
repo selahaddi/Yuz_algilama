@@ -202,7 +202,8 @@
             }
         })
         .catch(err => {
-            window.location.href = 'event_not_found.html';
+            console.error('Fetch error:', err);
+            document.body.innerHTML = `<div style="padding: 20px; color: red;"><h1>API Hatası</h1><p>${err.message}</p><p>Lütfen ekran görüntüsü alın.</p></div>`;
         });
 
     // Load Clusters
