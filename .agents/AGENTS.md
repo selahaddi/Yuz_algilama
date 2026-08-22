@@ -20,3 +20,7 @@
   - `MIN_DET_SCORE = 0.70` (Minimum yüz tespit doğruluk skoru)
   - `MIN_BLUR_SCORE = 15.00` (Minimum bulanıklık eşiği)
 - Bu değerler `worker.py` ve `tests/test_app.py` içinde standart olarak korunmalıdır.
+
+## 5. API ve Routing Kuralları
+- **FastAPI Statik Dosya Hizmeti:** `guest_api.py` içinde statik dosyaları servis etmek için kullanılan `app.mount("/", StaticFiles(directory="public", html=True), name="public")` satırı **DAİMA dosyanın en sonunda** bulunmalıdır. Aksi takdirde, POST ve diğer API route'larını engelleyip `405 Method Not Allowed` hatasına yol açar.
+- **Frontend ID Parametreleri:** Veritabanından (Supabase) fotoğraf verisi çekerken `id` alanı daima sorgulanmalı ve frontend'e iletilmelidir. İstemci tarafında seçim işlemlerinin (örneğin sepet) sorunsuz çalışması için eşsiz bir ID elzemdir.

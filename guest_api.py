@@ -298,7 +298,7 @@ def get_cluster_photos(cluster_id: int, event_id: str = Query(None)):
     event_id verilmişse, yalnızca o etkinlikteki fotoğrafları filtreler.
     """
     query = supabase.table("faces") \
-        .select("photos!inner(image_url, thumbnail_url, event_id)") \
+        .select("photos!inner(id, image_url, thumbnail_url, event_id)") \
         .eq("cluster_id", cluster_id)
 
     # event_id filtresi varsa ekle (güvenlik: başka etkinliklerin fotoğrafları karışmasın)
@@ -315,6 +315,7 @@ def get_cluster_photos(cluster_id: int, event_id: str = Query(None)):
         p = row.get("photos")
         if p:
             unique_photos[p["image_url"]] = {
+                "id": p["id"],
                 "image_url": p["image_url"],
                 "thumbnail_url": p.get("thumbnail_url")
             }
@@ -364,8 +365,6 @@ def trigger_worker():
         return {"status": "error", "message": f"Worker tetiklenemedi: {str(e)}"}
 
 
-# Statik frontend dosyalarını servis et (HTML/CSS/JS)
-app.mount("/", StaticFiles(directory="public", html=True), name="public")
 
 class OrderRequest(BaseModel):
     event_id: str
@@ -414,3 +413,6 @@ def submit_feedback(feedback: FeedbackRequest):
         return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# Statik frontend dosyalarını servis et (HTML/CSS/JS)
+app.mount("/", StaticFiles(directory="public", html=True), name="public")

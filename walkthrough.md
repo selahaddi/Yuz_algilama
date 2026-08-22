@@ -10,6 +10,22 @@ Stüdyo ve Misafir arayüzleri için talep ettiğiniz tüm geliştirmeler tamaml
 - **Gelişmiş Fotoğraf Yükleyici:** Yükleme işlemi sırasında "Duraklat" ve "Devam Et" butonları eklendi. Ayrıca stüdyo ayarlarında bir "Filigran Metni" belirlenmişse, tarayıcı tarafında küçültme (resize) yapılırken doğrudan resim üzerine filigran basılıyor.
 - **Sipariş Takibi:** Dashboard üzerindeki istatistiklere, etkinlik bazlı "Bekleyen Sipariş" sayısı eklendi.
 
+## 🐛 Troubleshooting & Bug Fixes
+
+**1. SyntaxError in `index.html` (Unescaped Single Quotes)**
+- **Issue:** The `photo.id` or other string fields in `encodedPhoto` occasionally contained single quotes (or string formats like `photo_id` were mismatched), breaking the HTML string injection in `index.html`.
+- **Fix:** Used `.replace(/'/g, "%27")` after `encodeURIComponent(JSON.stringify(photo))` to ensure the generated HTML `onclick` handler doesn't break due to unescaped quotes.
+
+**2. Photo Selection Bug (Selecting One Selects All)**
+- **Issue:** The frontend was attempting to use `photo.id` for each photo to handle selection uniquely. However, some API endpoints (`/api/cluster_photos`) did not return the `id` field from the database, meaning `photo.id` was `undefined`. This resulted in all photos having `data-photo-id="undefined"`, causing mass-selection when one photo was clicked.
+- **Fix:** 
+    - Updated `guest_api.py` to ensure `id` is retrieved and returned from the `photos` table.
+    - Updated `index.html` to fallback to `photo.photo_id` if `photo.id` is missing.
+
+**3. Checkout Order Error (Method Not Allowed)**
+- **Issue:** When submitting an order, the `/api/order` endpoint returned a `405 Method Not Allowed` error. This happened because `app.mount("/", StaticFiles(directory="public", html=True))` was placed *before* the order POST route in `guest_api.py`, intercepting the request and assuming it was a request for a static file (which only accepts GET).
+- **Fix:** Moved `app.mount` to the very bottom of `guest_api.py` so all API routes take precedence before falling back to static files.
+
 ## 2. Misafir Arayüzü Geliştirmeleri (`index.html`)
 
 - **PWA (Progressive Web App) Desteği:** `manifest.json` ve `sw.js` (Service Worker) dosyaları eklendi. Kullanıcılar artık siteyi ana ekranlarına bir uygulama gibi ekleyebilirler.

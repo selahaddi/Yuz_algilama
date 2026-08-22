@@ -51,3 +51,5 @@ Sistem 3 ana parçadan oluşmaktadır:
 1. Backend kütüphanesi eklenecekse **sadece `requirements-all.txt`** güncellenir.
 2. Vercel yönlendirmeleri **sadece `public/vercel.json`** üzerinden yapılır.
 3. Kullanılmayan eski (legacy) dosyalar projeden tamamen temizlenmiştir. Yeniden `st.write` vb. Streamlit kodları **üretilmemelidir**.
+4. **FastAPI Statik Routing:** `guest_api.py` dosyasında statik dosyaları (HTML/CSS) sunan `app.mount("/", StaticFiles(directory="public"...))` kodu **DAİMA en sonda** tutulmalıdır, yoksa API endpointleri ezilir ve `405 Method Not Allowed` hataları yaşanır.
+5. **Frontend ID İstemi:** Supabase `photos` veya `faces` tablolarından frontend'e veri döndürürken daima `id` alanını `select()` ile çekip dahil edin. Frontend seçim (sepet vb.) işlemleri için eşsiz `id` arar (Eksikliğinde javascript tarafında `"undefined"` hatası ve tüm resimlerin seçilmesi sorunu yaşanır).

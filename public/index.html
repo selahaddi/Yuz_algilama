@@ -324,11 +324,12 @@
         const heights = ['h-64', 'h-80', 'h-96'];
         const randomHeight = heights[Math.floor(Math.random() * heights.length)];
         const displayUrl = photo.thumbnail_url || photo.image_url;
-        const isSelected = selectedCart.has(photo.id);
-        const encodedPhoto = encodeURIComponent(JSON.stringify(photo));
+        const photoId = photo.id || photo.photo_id;
+        const isSelected = selectedCart.has(photoId);
+        const encodedPhoto = encodeURIComponent(JSON.stringify(photo)).replace(/'/g, "%27");
         
         return `
-            <div class="photo-card relative group rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 break-inside-avoid ${randomHeight} bg-surface-dim transform hover:-translate-y-1 cursor-pointer" data-photo-id="${photo.id}" onclick="toggleSelectPhoto('${photo.id}', '${encodedPhoto}')">
+            <div class="photo-card relative group rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 break-inside-avoid ${randomHeight} bg-surface-dim transform hover:-translate-y-1 cursor-pointer" data-photo-id="${photoId}" onclick="toggleSelectPhoto('${photoId}', '${encodedPhoto}')">
                 <img src="${displayUrl}" class="w-full h-full object-cover">
                 
                 <!-- Selection Overlay -->

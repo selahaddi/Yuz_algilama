@@ -1,0 +1,15 @@
+.gcloudignore
+.git
+.gitignore
+.venv
+.vercel
+node_modules
+__pycache__
+*.pyc
+archive/
+data/
+logs/
+README.md
+AI_ONBOARDING.md
+walkthrough.md
+*.md
