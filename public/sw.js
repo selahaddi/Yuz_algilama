@@ -2,10 +2,7 @@ const CACHE_NAME = 'photo-app-v2';
 const urlsToCache = [
   '/',
   '/index.html',
-  '/config.js',
-  'https://cdn.tailwindcss.com',
-  'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js'
+  '/config.js'
 ];
 
 self.addEventListener('install', event => {
