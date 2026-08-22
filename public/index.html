@@ -445,7 +445,7 @@
             const btn = document.getElementById('lightbox-feedback-btn');
             btn.innerHTML = '<span class="material-symbols-outlined animate-spin">refresh</span> Gönderiliyor...';
             try {
-                await fetch(GUEST_API_URL + '/api/feedback', {
+                const res = await fetch(GUEST_API_URL + '/api/feedback', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
@@ -454,9 +454,13 @@
                         cluster_id: document.getElementById('person-select-hidden').value || null
                     })
                 });
+                if (!res.ok) {
+                    const data = await res.json();
+                    throw new Error(data.detail || "Hata oluştu");
+                }
                 alert("Bildiriminiz alındı, teşekkürler.");
             } catch(e) {
-                alert("Bildirim gönderilemedi.");
+                alert("Bildirim gönderilemedi: " + e.message);
             }
             btn.innerHTML = '<span class="material-symbols-outlined">report</span> Bu ben değilim';
             closeLightbox();

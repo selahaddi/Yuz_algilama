@@ -114,3 +114,7 @@ CREATE POLICY "Allow public all for photos" ON photos FOR ALL USING (true) WITH 
 CREATE POLICY "Allow public all for faces" ON faces FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow public all for orders" ON orders FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow public all for feedbacks" ON feedbacks FOR ALL USING (true) WITH CHECK (true);
+
+-- Önemli Hata Çözümü: RLS açık bile olsa service_role ve anon'a temel yetkiler verilmelidir.
+GRANT ALL ON public.orders TO anon, authenticated, service_role;
+GRANT ALL ON public.feedbacks TO anon, authenticated, service_role;
