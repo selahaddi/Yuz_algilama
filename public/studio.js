@@ -711,16 +711,18 @@ async function processUploadQueue() {
         uploadProgressBar.style.width = `${percent}%`;
 
         try {
-            const thumbnailFile = await resizeImage(file, 1024);
+            // Yapay zekanın (InsightFace) uzaktaki küçük yüzleri (50px eşiği) bulabilmesi için
+            // çözünürlüğün en az 1920px olması gerekiyor. (1024px çok küçük kalıyordu)
+            const resizedFile = await resizeImage(file, 1920);
             const fileName = `${crypto.randomUUID()}`;
             
-            await supabaseClient.storage.from('wedding_photos').upload(`${fileName}_thumb.jpg`, thumbnailFile);
-            const { data: thumbData } = supabaseClient.storage.from('wedding_photos').getPublicUrl(`${fileName}_thumb.jpg`);
+            await supabaseClient.storage.from('wedding_photos').upload(`${fileName}.jpg`, resizedFile);
+            const { data: photoData } = supabaseClient.storage.from('wedding_photos').getPublicUrl(`${fileName}.jpg`);
             
             const { error: dbError } = await supabaseClient.from('photos').insert([{
                 event_id: currentEvent.id,
-                image_url: thumbData.publicUrl, 
-                thumbnail_url: thumbData.publicUrl 
+                image_url: photoData.publicUrl, 
+                thumbnail_url: photoData.publicUrl 
             }]);
             
             if (dbError) throw dbError;
