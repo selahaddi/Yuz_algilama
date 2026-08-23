@@ -75,6 +75,23 @@ function showAuth() {
     appView.classList.add('hidden');
     currentUser = null;
     currentStudioId = null;
+    currentEvent = null;
+    
+    // UI Reset (Hesap değiştirince eski verilerin görünmemesi için)
+    if(emptyState && eventDetails) {
+        emptyState.classList.remove('hidden');
+        eventDetails.classList.add('hidden');
+    }
+    
+    // Dashboard Reset
+    document.getElementById('dash-total-revenue').textContent = '0 TL';
+    document.getElementById('dash-active-events').textContent = '0';
+    document.getElementById('dash-pending-orders').textContent = '0';
+    document.getElementById('dash-recent-orders').innerHTML = '<p class="text-sm text-[#696868]">Henüz sipariş yok.</p>';
+    document.getElementById('notification-dot').classList.add('hidden');
+    
+    const ordersContainer = document.getElementById('orders-list-container');
+    if(ordersContainer) ordersContainer.innerHTML = '';
 }
 
 function showApp() {
@@ -208,6 +225,7 @@ async function handleUserLogin(user) {
 // Events
 window.loadEvents = async function(status = 'active') {
     currentEventFilter = status;
+    if (!currentStudioId) return;
     
     // UI Update for filters
     const btnActive = document.getElementById('filter-active');
@@ -905,7 +923,14 @@ async function fetchDashboardStats() {
     let pendingOrdersCount = 0;
     
     const { data: events } = await supabaseClient.from('events').select('id, status').eq('studio_id', currentStudioId);
-    if (!events || events.length === 0) return;
+    if (!events || events.length === 0) {
+        document.getElementById('dash-total-revenue').textContent = '0 TL';
+        document.getElementById('dash-active-events').textContent = '0';
+        document.getElementById('dash-pending-orders').textContent = '0';
+        document.getElementById('dash-recent-orders').innerHTML = '<p class="text-sm text-[#696868]">Henüz sipariş yok.</p>';
+        document.getElementById('notification-dot').classList.add('hidden');
+        return;
+    }
     
     activeEventsCount = events.filter(e => e.status === 'active' || !e.status).length;
     const eventIds = events.map(e => e.id);
