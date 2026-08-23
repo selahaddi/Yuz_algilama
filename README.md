@@ -35,7 +35,7 @@ Proje mimarisi frontend, backend ve yapay zeka worker'ı olmak üzere üçe ayr�
 ### 3. AI Worker Job (Google Cloud Run Jobs)
 - **Konum:** `worker.py`, `core/face_analyzer.py`
 - **Teknoloji:** Python, InsightFace (`buffalo_s`), Scikit-Learn (DBSCAN).
-- **İşlev:** Stüdyo yeni fotoğraflar yüklediğinde arka planda tetiklenir. Yüzleri bulur, vektörleştirir ve gruplar. İşlemleri `ThreadPoolExecutor` ile asenkron yürütür.
+- **İşlev:** Stüdyo yeni fotoğraflar yüklediğinde arka planda tetiklenir. Yüzleri bulur, vektörleştirir ve gruplar. İşlemleri `ThreadPoolExecutor` ile asenkron yürütür. Eski kümelerle eşleştirmelerde (Kosinüs Benzerliği) `SIMILARITY_THRESHOLD = 0.55` kullanılır.
 - **Yüz Tanıma Eşikleri:** Uzaktaki/küçük yüzlerin tespiti için `MIN_FACE_SIZE = 50`, `MIN_DET_SCORE = 0.70`, `MIN_BLUR_SCORE = 15.00` olarak optimize edilmiştir.
 
 ---
@@ -59,7 +59,7 @@ IMAGE="europe-west1-docker.pkg.dev/${PROJECT_ID}/yuz-tanima-repo/app-image:lates
 gcloud builds submit --tag $IMAGE --project=$PROJECT_ID
 
 # 2. Guest API Güncelleme
-gcloud run deploy guest-api --image $IMAGE --cpu 2 --min-instances 1 --region $REGION --project $PROJECT_ID
+gcloud run deploy guest-api --image $IMAGE --cpu 2 --min-instances 1 --memory 2048Mi --region $REGION --project $PROJECT_ID
 
 # 3. Worker Job Güncelleme
 gcloud run jobs update face-worker-job --image $IMAGE --cpu 2 --region $REGION --project $PROJECT_ID

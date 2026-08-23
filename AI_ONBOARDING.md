@@ -22,12 +22,12 @@ Sistem 3 ana parçadan oluşmaktadır:
 - **Konum:** Kök dizindeki `guest_api.py`
 - **Teknoloji:** Python, FastAPI, Supabase Python Client.
 - **İşlev:** Vercel üzerinden gelen API isteklerini karşılar (`/api/search_selfie`, `/api/trigger_worker` vb.).
-- **Önemli:** CPU-bound ONNX model analizinin event-loop'u kilitlemesini önlemek için `/api/search_selfie` endpoint'i senkron `def` olarak tanımlanmıştır (Starlette threadpool'unda çalışır). InsightFace modeli burada "Lazy Loading" ile (sadece selfie arandığında) yüklenir. Cloud Run deploy edilirken `uvicorn guest_api:app` komutu ile başlatılır.
+- **Önemli:** CPU-bound ONNX model analizinin event-loop'u kilitlemesini önlemek için `/api/search_selfie` endpoint'i senkron `def` olarak tanımlanmıştır (Starlette threadpool'unda çalışır). InsightFace modeli "Eager Loading" ile (sunucu ilk başladığında) yüklenir. Cloud Run deploy edilirken `uvicorn guest_api:app` komutu ile başlatılır ve bellek yetersizliğini/Cold Start'ı önlemek için `--memory 2048Mi` ve `--min-instances 1` ile deploy edilir.
 
 ### C. AI Worker (Google Cloud Run Jobs / Background Task)
 - **Konum:** Kök dizindeki `worker.py` ve `core/` klasörü.
 - **Teknoloji:** Python, InsightFace (`buffalo_s`), Scikit-Learn (DBSCAN).
-- **İşlev:** Stüdyo yeni fotoğraflar yüklediğinde arka planda çalışır. Yüzleri tespit eder, 512 boyutlu vektör (embedding) çıkarır ve benzer yüzleri **Kademeli (Incremental) DBSCAN** ile kümelendirir. Etkinlikteki tüm yüzleri baştan kümelemek yerine, yeni yüzleri mevcut kümelerin Merkezleri (Centroid) ile Kosinüs Benzerliği üzerinden eşleştirir (Performans Optimizasyonu).
+- **İşlev:** Stüdyo yeni fotoğraflar yüklediğinde arka planda çalışır. Yüzleri tespit eder, 512 boyutlu vektör (embedding) çıkarır ve benzer yüzleri **Kademeli (Incremental) DBSCAN** ile kümelendirir. Etkinlikteki tüm yüzleri baştan kümelemek yerine, yeni yüzleri mevcut kümelerin Merkezleri (Centroid) ile Kosinüs Benzerliği üzerinden eşleştirir (Performans Optimizasyonu). DBSCAN `eps=0.45` değerinin birebir karşılığı olan `SIMILARITY_THRESHOLD = 0.55` kullanılır.
 - **Thread-Safety & Güvenlik:** ONNX Runtime çökmesini önlemek için `analyze_image` çağrıları global `threading.Lock()` ile korunur. Fotoğraf çekiminde `events.status = 'active'` filtresiyle silinmiş etkinlik resimleri işlenmez. Otomatik temizlik (`cleanup_events.py`) silme öncesi `orders` tablosunu kontrol ederek askıda siparişi olan etkinlikleri silmez.
 - **Yüz Eşikleri:** Uzaktaki yüzleri kaçırmamak için: `MIN_FACE_SIZE = 50`, `MIN_DET_SCORE = 0.70`, `MIN_BLUR_SCORE = 15.00`.
 
@@ -43,7 +43,7 @@ Sistem 3 ana parçadan oluşmaktadır:
 - **Backend / Worker:** `gcloud` ile Google Cloud'a deploy edilir. 
   ```bash
   # API için:
-  gcloud run deploy guest-api --image $IMAGE --command="uvicorn" --args="guest_api:app,--host=0.0.0.0,--port=8080"
+  gcloud run deploy guest-api --image $IMAGE --command="uvicorn" --args="guest_api:app,--host=0.0.0.0,--port=8080" --min-instances 1 --memory 2048Mi
   
   # Worker için:
   gcloud run jobs update face-worker-job --image $IMAGE

@@ -13,8 +13,9 @@
 
 ## 3. Kod ve Deployment Akışı
 - Frontend (Vercel) değişikliği için: Localde düzenle -> `git add` -> `git commit` -> `git push origin master`.
-- Backend (Cloud Run) değişikliği için: Localde düzenle -> `gcloud builds submit` -> `gcloud run deploy guest-api --region europe-west4`. 
+- Backend (Cloud Run) değişikliği için: Localde düzenle -> `gcloud builds submit` -> `gcloud run deploy guest-api --region europe-west4 --min-instances 1 --memory 2048Mi`. 
   - **DİKKAT (Bölge Uyuşmazlığı):** Vercel'deki (`public/vercel.json`) API yönlendirmesi `guest-api`'nin `europe-west4` bölgesindeki adresine (https://guest-api-398389727192.europe-west4.run.app) gitmektedir. `guest-api` sunucusu mutlaka `europe-west4`'e deploy edilmelidir. Yüz tanıma işlemi (`face-worker-job`) ise `europe-west1`'dedir; bu yüzden `guest_api.py` içerisinde işleyiciyi tetikleyen URL'de bölge sabit olarak `europe-west1` verilmelidir. (Ortam değişkeninden dinamik bölge okunursa 404 hatası alınır ve hata yutulduğu için sessizce takılır).
+  - **DİKKAT (Cold Start & OOMKilled):** Yüz tanıma modeli Eager Loading ile (sunucu ilk açıldığında) yüklendiği için minimum 2048Mi RAM gereklidir ve timeout olmaması için min-instances 1 kullanılmalıdır.
 
 ## 4. Yapay Zeka (AI) ve Yüz Tanıma Parametreleri
 - **Eşik Değerleri (Thresholds):** Sistemdeki yüz tanıma doğruluğunu artırmak ve uzaktaki küçük yüzleri tespit edebilmek için sabit değerler şu şekildedir:
