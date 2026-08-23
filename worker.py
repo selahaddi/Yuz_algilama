@@ -19,6 +19,9 @@ from dotenv import load_dotenv
 import concurrent.futures
 import threading
 
+# Global Lock for FaceAnalyzer Thread-Safety (Prevent ONNX Runtime segfaults)
+analyzer_lock = threading.Lock()
+
 # Yapay Zeka Modüllerini İçe Aktar
 from core.face_analyzer import FaceAnalyzer
 from core.clusterer import FaceClusterer
@@ -65,105 +68,110 @@ THUMBNAIL_MAX_SIZE = 800     # Maksimum thumbnail boyutu (piksel)
 
 def update_clusters_for_event(clusterer: FaceClusterer, event_id: str):
     """
-    Belirli bir etkinliğe ait tüm yüz vektörlerini çeker, yeniden kümeleme (DBSCAN) yapar.
-    Önceki küme atamaları ile karşılaştırarak kararlı (stabil) ID'ler atar
-    ve sadece değişenleri veritabanında günceller.
+    Kademeli (Incremental) Kümeleme:
+    Tüm yüzleri baştan kümelemek yerine, sadece yeni gelen yüzleri mevcut kümelerin 
+    merkezleri (Centroid) ile Kosinüs Benzerliği üzerinden eşleştirir.
+    Eşleşmeyenleri kendi arasında DBSCAN ile yeni kümelere ayırır.
     """
-    logger.info(f"[{event_id}] Etkinliği için yüzler kümeleniyor...")
+    logger.info(f"[{event_id}] Etkinliği için kademeli (incremental) kümeleme yapılıyor...")
     
-    # Sadece o etkinliğe ait yüzleri çek (photo_id üzerinden)
+    # 1. Tüm yüzleri çek
     response = supabase.table("faces") \
         .select("id, embedding, cluster_id, photos!inner(event_id)") \
         .eq("photos.event_id", event_id) \
         .execute()
         
     faces_data = response.data
-    
     if not faces_data:
-        logger.info(f"[{event_id}] Veritabanında yüz bulunamadı.")
         return
         
-    embeddings = []
-    face_ids = []
-    old_cluster_ids = []
+    clustered_faces = []
+    new_faces = []
     
     for row in faces_data:
-        face_ids.append(row["id"])
-        old_cluster_ids.append(row.get("cluster_id"))
         emb = row["embedding"]
-        
         if isinstance(emb, str):
             emb = json.loads(emb)
-            
-        embeddings.append(np.array(emb, dtype=np.float32))
+        emb = np.array(emb, dtype=np.float32)
         
-    # Kümeleme (DBSCAN) yap
-    new_labels = clusterer.cluster(embeddings)
-    
-    # ─── Küme Kararlılığı (Cluster Stability) ──────────────────────────────
-    stabilized_labels = _stabilize_cluster_ids(old_cluster_ids, new_labels)
-    
-    # ─── Toplu Güncelleme (Batch Update) ───────────────────────────────────
+        cid = row.get("cluster_id")
+        if cid is not None and cid != -1:
+            clustered_faces.append({"id": row["id"], "cluster_id": cid, "embedding": emb})
+        else:
+            new_faces.append({"id": row["id"], "embedding": emb})
+            
+    if not new_faces:
+        logger.info(f"[{event_id}] İşlenecek yeni yüz bulunamadı.")
+        return
+        
     updates_count = 0
-    for face_id, old_label, new_label in zip(face_ids, old_cluster_ids, stabilized_labels):
-        if old_label != new_label:
-            supabase.table("faces").update({"cluster_id": int(new_label)}).eq("id", face_id).execute()
-            updates_count += 1
-        
-    unique_people = len(set(label for label in stabilized_labels if label != -1))
-    logger.info(
-        f"[{event_id}] Kümeleme tamamlandı! {len(faces_data)} yüz -> {unique_people} kişi. "
-        f"{updates_count} kayıt güncellendi."
-    )
-
-def _stabilize_cluster_ids(old_ids: list, new_ids: list) -> list:
-    if not old_ids or all(o is None for o in old_ids):
-        return new_ids
+    max_existing_id = -1
     
-    from collections import Counter
-    
-    new_to_old_votes = {}
-    for old_id, new_id in zip(old_ids, new_ids):
-        if new_id == -1:
-            continue
-        if new_id not in new_to_old_votes:
-            new_to_old_votes[new_id] = Counter()
-        if old_id is not None and old_id != -1:
-            new_to_old_votes[new_id][old_id] += 1
-    
-    new_to_stable = {}
-    used_old_ids = set()
-    
-    mapping_candidates = []
-    for new_id, votes in new_to_old_votes.items():
-        if votes:
-            best_old_id, best_count = votes.most_common(1)[0]
-            mapping_candidates.append((best_count, new_id, best_old_id))
-    
-    mapping_candidates.sort(reverse=True)
-    
-    for _, new_id, old_id in mapping_candidates:
-        if old_id not in used_old_ids:
-            new_to_stable[new_id] = old_id
-            used_old_ids.add(old_id)
-    
-    max_existing_id = max(
-        (oid for oid in old_ids if oid is not None and oid != -1),
-        default=-1
-    )
-    next_id = max_existing_id + 1
-    
-    for new_id in set(new_ids):
-        if new_id == -1:
-            continue
-        if new_id not in new_to_stable:
-            new_to_stable[new_id] = next_id
-            next_id += 1
+    # 2. Mevcut Kümelerin Merkezlerini (Centroids) Hesapla
+    centroids = {}
+    if clustered_faces:
+        from collections import defaultdict
+        cluster_embs = defaultdict(list)
+        for cf in clustered_faces:
+            cluster_embs[cf["cluster_id"]].append(cf["embedding"])
+            if cf["cluster_id"] > max_existing_id:
+                max_existing_id = cf["cluster_id"]
+                
+        for cid, embs in cluster_embs.items():
+            mean_emb = np.mean(embs, axis=0)
+            norm = np.linalg.norm(mean_emb)
+            if norm > 0:
+                mean_emb = mean_emb / norm
+            centroids[cid] = mean_emb
             
-    return [
-        -1 if label == -1 else new_to_stable.get(label, label)
-        for label in new_ids
-    ]
+    # 3. Yeni Yüzleri Centroid'ler ile Eşleştir (Cosine Similarity)
+    leftover_faces = []
+    from numpy import dot
+    
+    # InsightFace buffalo_s için Kosinüs Benzerliği Eşiği
+    # Bu değer ne kadar yüksekse eşleşme o kadar katı (strict) olur.
+    SIMILARITY_THRESHOLD = 0.50 
+    
+    for nf in new_faces:
+        best_cid = -1
+        best_sim = -1.0
+        
+        if centroids:
+            nf_norm = np.linalg.norm(nf["embedding"])
+            nf_emb_norm = nf["embedding"] / nf_norm if nf_norm > 0 else nf["embedding"]
+            
+            for cid, c_emb in centroids.items():
+                sim = dot(nf_emb_norm, c_emb)
+                if sim > best_sim:
+                    best_sim = sim
+                    best_cid = cid
+                    
+        if best_sim >= SIMILARITY_THRESHOLD:
+            # Mevcut kümeye ata
+            supabase.table("faces").update({"cluster_id": int(best_cid)}).eq("id", nf["id"]).execute()
+            updates_count += 1
+        else:
+            leftover_faces.append(nf)
+            
+    # 4. Kalan (Leftover) Yüzleri Kendi İçinde DBSCAN ile Kümele
+    if leftover_faces:
+        leftover_embs = [f["embedding"] for f in leftover_faces]
+        new_labels = clusterer.cluster(leftover_embs)
+        
+        # Noise (-1) noktalarını benzersiz kümelere çevir (Ayrı kişiler olarak değerlendir)
+        local_max = max(new_labels) if len(new_labels) > 0 else -1
+        for i in range(len(new_labels)):
+            if new_labels[i] == -1:
+                local_max += 1
+                new_labels[i] = local_max
+                
+        # Mevcut en yüksek ID'nin üzerine ekleyerek veritabanına kaydet
+        for i, nf in enumerate(leftover_faces):
+            final_cluster_id = int(max_existing_id + 1 + new_labels[i])
+            supabase.table("faces").update({"cluster_id": final_cluster_id}).eq("id", nf["id"]).execute()
+            updates_count += 1
+            
+    logger.info(f"[{event_id}] Kademeli Kümeleme tamamlandı! {len(new_faces)} yeni yüz işlendi. {updates_count} kayıt güncellendi.")
 
 def generate_and_upload_thumbnail(img_cv2, photo_id: str) -> str:
     """Orijinal resmi boyutlandırır, sıkıştırır ve Storage'a thumbnail olarak yükler."""
@@ -218,8 +226,9 @@ def process_single_photo(analyzer: FaceAnalyzer, photo: dict) -> int:
         supabase.table("photos").update({"processed": True}).eq("id", photo_id).execute()
         return 0
         
-    # Yüzleri tespit et (Thread-safe yapmak için lock kullanabiliriz ancak ONNXRuntime genellikle sorun çıkarmaz. Yine de ağ I/O çok zaman alıyor)
-    faces = analyzer.analyze_image(img)
+    # Yüzleri tespit et (Thread-safe yapmak için lock)
+    with analyzer_lock:
+        faces = analyzer.analyze_image(img)
     logger.info(f"   => Fotoğrafta {len(faces)} yüz bulundu.")
     
     valid_faces_count = 0
@@ -285,9 +294,11 @@ def start_worker():
 
     while True:
         try:
+            # Sadece 'active' statüsündeki etkinliklerin fotoğraflarını çek (Race Condition Fix)
             res = supabase.table("photos") \
-                .select("*") \
+                .select("*, events!inner(status)") \
                 .eq("processed", False) \
+                .eq("events.status", "active") \
                 .limit(BATCH_SIZE) \
                 .execute()
             

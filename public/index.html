@@ -131,7 +131,10 @@
     <button class="absolute top-4 right-4 text-white hover:text-primary transition-colors p-2" onclick="closeLightbox()">
         <span class="material-symbols-outlined text-4xl">close</span>
     </button>
-    <img id="lightbox-img" src="" class="max-w-[90vw] max-h-[80vh] object-contain rounded-lg shadow-2xl">
+    <div class="relative max-w-[90vw] max-h-[80vh] flex items-center justify-center watermark-container">
+        <img id="lightbox-img" src="" class="max-w-[90vw] max-h-[80vh] object-contain rounded-lg shadow-2xl protected-image" oncontextmenu="return false;">
+        <div class="watermark-overlay"></div>
+    </div>
     <div class="absolute bottom-8 flex gap-4">
         <button id="lightbox-feedback-btn" class="px-4 py-2 bg-error/20 text-error-container border border-error rounded-full font-label-md flex items-center gap-2 hover:bg-error/40 transition-colors" onclick="reportFeedback()">
             <span class="material-symbols-outlined">report</span> Bu ben değilim
@@ -178,7 +181,7 @@
             }
             
             // White-label: Apply Studio Settings if available
-            if (data.primary_color || data.logo_url) {
+            if (data.primary_color || data.logo_url || data.watermark_text) {
                 if (data.primary_color) {
                     document.documentElement.style.setProperty('--primary', data.primary_color);
                     // Add tailwind arbitrary value override logic if possible, 
@@ -198,6 +201,48 @@
                     const logoEl = document.getElementById('header-logo');
                     logoEl.src = data.logo_url;
                     logoEl.classList.remove('hidden');
+                }
+                
+                // Dynamic CSS Watermark Setup
+                if (data.watermark_text) {
+                    const wmOpacity = data.watermark_opacity !== undefined ? data.watermark_opacity : 0.6;
+                    const wmAngle = data.watermark_angle !== undefined ? data.watermark_angle : 0;
+                    // watermark_size is usually a ratio like 0.05. We can scale it with CSS scale or font-size.
+                    const wmScale = data.watermark_size !== undefined ? parseFloat(data.watermark_size) * 15 : 1;
+                    
+                    const svgText = encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 200" width="600" height="200"><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="Arial, sans-serif" font-size="60" font-weight="bold" fill="white" stroke="rgba(0,0,0,0.5)" stroke-width="2">${data.watermark_text}</text></svg>`);
+                    const wmBackground = `url('data:image/svg+xml;utf8,${svgText}')`;
+                    
+                    const wmStyle = document.createElement('style');
+                    wmStyle.innerHTML = `
+                        .watermark-overlay {
+                            position: absolute;
+                            inset: 0;
+                            pointer-events: none;
+                            user-select: none;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            opacity: ${wmOpacity};
+                            transform: rotate(${wmAngle}deg) scale(${wmScale});
+                            background-image: ${wmBackground};
+                            background-size: contain;
+                            background-repeat: no-repeat;
+                            background-position: center;
+                            z-index: 10;
+                        }
+                        .watermark-container {
+                            position: relative;
+                            width: 100%;
+                            height: 100%;
+                        }
+                        /* Prevent easy right click */
+                        .protected-image {
+                            -webkit-user-drag: none;
+                            user-select: none;
+                        }
+                    `;
+                    document.head.appendChild(wmStyle);
                 }
             }
         })
@@ -330,7 +375,10 @@
         
         return `
             <div class="photo-card relative group rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 break-inside-avoid ${randomHeight} bg-surface-dim transform hover:-translate-y-1 cursor-pointer" data-photo-id="${photoId}" onclick="toggleSelectPhoto('${photoId}', '${encodedPhoto}')">
-                <img src="${displayUrl}" class="w-full h-full object-cover">
+                <div class="watermark-container">
+                    <img src="${displayUrl}" class="w-full h-full object-cover protected-image" oncontextmenu="return false;">
+                    <div class="watermark-overlay"></div>
+                </div>
                 
                 <!-- Selection Overlay -->
                 <div class="selection-overlay absolute inset-0 border-4 transition-colors duration-200 ${isSelected ? 'border-primary bg-primary/10' : 'border-transparent group-hover:bg-black/20'}"></div>

@@ -16,25 +16,27 @@ Sistem 3 ana parçadan oluşmaktadır:
   - `public/index.html` & `public/app.js` (Misafir Yüz Arama Arayüzü)
   - `public/studio.html` & `public/studio.js` (Fotoğrafçı Yönetim Paneli: Dashboard, Galeri, Sipariş Detayları, Etkinlik Durumları)
   - `public/config.js` (API ve Supabase Key ayarları)
-- **Önemli Kural:** Storage maliyetlerini düşürmek için fotoğraflar Supabase'e yüklenmeden önce **mutlaka tarayıcıda Canvas ile 1920px'e** küçültülür. Ayrıca filigran (watermark) işlemleri de opacity, size ve angle hesaplamalarıyla bu aşamada Canvas üzerinde uygulanır (`studio.js` -> `resizeImage`).
+- **Önemli Kural:** Storage maliyetlerini düşürmek için fotoğraflar Supabase'e yüklenmeden önce **mutlaka tarayıcıda Canvas ile 1920px'e** küçültülür. Filigran (watermark) işlemleri Canvas üzerinde kalıcı olarak UYGULANMAZ (orijinalliği korumak için). Bunun yerine Frontend tarafında dinamik CSS Overlay (`watermark-overlay`) ile gösterilir. `blueimp-load-image` kütüphanesi sayesinde EXIF yönelim açıları (iPhone vb. dikey fotoğraflar) Canvas'a çizilmeden önce otomatik düzeltilir.
 
 ### B. Backend API (Google Cloud Run)
 - **Konum:** Kök dizindeki `guest_api.py`
 - **Teknoloji:** Python, FastAPI, Supabase Python Client.
 - **İşlev:** Vercel üzerinden gelen API isteklerini karşılar (`/api/search_selfie`, `/api/trigger_worker` vb.).
-- **Önemli:** InsightFace modeli burada "Lazy Loading" ile (sadece selfie arandığında) yüklenir. Cloud Run deploy edilirken `uvicorn guest_api:app` komutu ile başlatılır.
+- **Önemli:** CPU-bound ONNX model analizinin event-loop'u kilitlemesini önlemek için `/api/search_selfie` endpoint'i senkron `def` olarak tanımlanmıştır (Starlette threadpool'unda çalışır). InsightFace modeli burada "Lazy Loading" ile (sadece selfie arandığında) yüklenir. Cloud Run deploy edilirken `uvicorn guest_api:app` komutu ile başlatılır.
 
 ### C. AI Worker (Google Cloud Run Jobs / Background Task)
 - **Konum:** Kök dizindeki `worker.py` ve `core/` klasörü.
 - **Teknoloji:** Python, InsightFace (`buffalo_s`), Scikit-Learn (DBSCAN).
-- **İşlev:** Stüdyo yeni fotoğraflar yüklediğinde arka planda çalışır. Yüzleri tespit eder, 512 boyutlu vektör (embedding) çıkarır ve benzer yüzleri DBSCAN ile kümelendirir.
+- **İşlev:** Stüdyo yeni fotoğraflar yüklediğinde arka planda çalışır. Yüzleri tespit eder, 512 boyutlu vektör (embedding) çıkarır ve benzer yüzleri **Kademeli (Incremental) DBSCAN** ile kümelendirir. Etkinlikteki tüm yüzleri baştan kümelemek yerine, yeni yüzleri mevcut kümelerin Merkezleri (Centroid) ile Kosinüs Benzerliği üzerinden eşleştirir (Performans Optimizasyonu).
+- **Thread-Safety & Güvenlik:** ONNX Runtime çökmesini önlemek için `analyze_image` çağrıları global `threading.Lock()` ile korunur. Fotoğraf çekiminde `events.status = 'active'` filtresiyle silinmiş etkinlik resimleri işlenmez. Otomatik temizlik (`cleanup_events.py`) silme öncesi `orders` tablosunu kontrol ederek askıda siparişi olan etkinlikleri silmez.
 - **Yüz Eşikleri:** Uzaktaki yüzleri kaçırmamak için: `MIN_FACE_SIZE = 50`, `MIN_DET_SCORE = 0.70`, `MIN_BLUR_SCORE = 15.00`.
 
 ## 3. Veritabanı Yapısı (Supabase PostgreSQL)
 - **studios:** Kayıtlı fotoğrafçıları tutar. (Ek ayarlar: `watermark_opacity`, `watermark_size`, `watermark_angle` vb.)
 - **events:** Düğün/Etkinlik bilgilerini tutar. (Ek durum: `status` -> active/archived)
 - **photos:** Yüklenen etkinlik fotoğraflarının Storage URL'lerini tutar.
-- **faces:** Fotoğraflarda tespit edilen her bir yüzün embedding vektörünü (`vector(512)` pgvector) tutar. Yüz arama burada cosine distance ile yapılır.
+- **faces:** Fotoğraflarda tespit edilen her bir yüzün embedding vektörünü (`vector(512)` pgvector) tutar. Yüz arama burada cosine distance ile yapılır. Vektör indeksi olarak performans ve ölçeklenebilirlik için `hnsw` (`vector_cosine_ops`) kullanılır.
+- **Güvenlik (RLS):** Tüm tablolarda Row Level Security (RLS) aktiftir. `auth.uid()` bazlı sıkı yetkilendirme uygulanır.
 
 ## 4. Deployment (Yayınlama) Süreçleri
 - **Frontend:** GitHub `master` dalına pushlandığında Vercel otomatik derler. `public/` dizini serve edilir.

@@ -77,7 +77,7 @@ avatar_cache = LRUAvatarCache(maxsize=200)
 
 @app.get("/api/event/{event_id}")
 def get_event(event_id: str):
-    res = supabase.table("events").select("*, studios(name, primary_color, logo_url, watermark_text)").eq("id", event_id).execute()
+    res = supabase.table("events").select("*, studios(name, primary_color, logo_url, watermark_text, watermark_opacity, watermark_size, watermark_angle)").eq("id", event_id).execute()
     if not res.data:
         raise HTTPException(status_code=404, detail="Etkinlik bulunamadı")
     event_data = res.data[0]
@@ -89,16 +89,19 @@ def get_event(event_id: str):
         event_data["primary_color"] = studio.get("primary_color") or "#685d4a"
         event_data["logo_url"] = studio.get("logo_url")
         event_data["watermark_text"] = studio.get("watermark_text")
+        event_data["watermark_opacity"] = studio.get("watermark_opacity")
+        event_data["watermark_size"] = studio.get("watermark_size")
+        event_data["watermark_angle"] = studio.get("watermark_angle")
         
     return event_data
 
 
 @app.post("/api/search_selfie")
-async def search_selfie(event_id: str = Form(...), search_mode: str = Form("single"), file: UploadFile = File(...)):
+def search_selfie(event_id: str = Form(...), search_mode: str = Form("single"), file: UploadFile = File(...)):
     # search_mode: "single" (en büyük yüz), "any" (herhangi biri), "all" (herkesin olduğu)
     analyzer = get_analyzer()
 
-    contents = await file.read()
+    contents = file.file.read()
     nparr = np.frombuffer(contents, np.uint8)
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
     
@@ -323,6 +326,9 @@ def get_cluster_photos(cluster_id: int, event_id: str = Query(None)):
     return {"photos": list(unique_photos.values())}
 
 
+import logging
+logger = logging.getLogger(__name__)
+
 @app.post("/api/trigger_worker")
 def trigger_worker():
     """
@@ -330,7 +336,7 @@ def trigger_worker():
     Studio App fotoğraf yüklemesi tamamlandığında bu endpoint çağrılır.
     """
     project_id = os.environ.get("GCP_PROJECT_ID", "yuz-tanima-app-9947")
-    region = os.environ.get("GCP_REGION", "europe-west1")
+    region = "europe-west1"
     job_name = "face-worker-job"
 
     # Google Cloud Run Jobs Admin API v2 — doğru URL formatı
@@ -359,9 +365,13 @@ def trigger_worker():
 
     except requests.exceptions.ConnectionError:
         # Yerel geliştirme ortamında metadata server erişilemez — sessizce geç
+        logger.error("Yerel ortamda çalışıyor, Cloud Run Job tetiklenemedi.")
         return {"status": "skipped", "message": "Yerel ortamda çalışıyor, Cloud Run Job tetiklenemedi."}
     except Exception as e:
         # Tetikleme başarısız olsa bile fotoğraflar yüklendi, kritik bir hata değil
+        logger.error(f"Worker tetiklenemedi: {str(e)}")
+        if 'run_res' in locals():
+            logger.error(f"Response: {run_res.text}")
         return {"status": "error", "message": f"Worker tetiklenemedi: {str(e)}"}
 
 

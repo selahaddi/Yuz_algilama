@@ -39,6 +39,16 @@ def main():
         event_title = event["title"]
         print(f"\n🗑️ Etkinlik Siliniyor: {event_title} (ID: {event_id})")
         
+        # 0. Bekleyen sipariş (pending, processing) var mı kontrol et
+        try:
+            orders_res = supabase.table("orders").select("id").eq("event_id", event_id).in_("status", ["pending", "processing"]).limit(1).execute()
+            if orders_res.data:
+                print(f"   -> ⚠️ Uyarı: Etkinlikte bekleyen siparişler var. Silme işlemi atlandı!")
+                continue
+        except Exception as e:
+            # Eğer orders tablosu yoksa (veya başka bir hata varsa) uyarı ver ve geç
+            print(f"   -> ⚠️ Uyarı: Siparişler kontrol edilemedi: {e}")
+            
         # 1. Bu etkinliğe ait fotoğrafları bul
         photos_res = supabase.table("photos").select("image_url, thumbnail_url").eq("event_id", event_id).execute()
         photos = photos_res.data

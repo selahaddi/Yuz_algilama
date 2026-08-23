@@ -566,33 +566,16 @@ dropZone.addEventListener('drop', (e) => {
 // Advanced Watermark logic integrated in resizeImage
 function resizeImage(file, maxSize) {
     return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const img = new Image();
-            img.onload = async () => {
-                let width = img.width;
-                let height = img.height;
-
-                if (width > height) {
-                    if (width > maxSize) {
-                        height *= maxSize / width;
-                        width = maxSize;
-                    }
-                } else {
-                    if (height > maxSize) {
-                        width *= maxSize / height;
-                        height = maxSize;
-                    }
+        // blueimp-load-image kütüphanesi kullanarak EXIF rotasyonunu düzeltiyoruz
+        window.loadImage(
+            file,
+            async function (canvas) {
+                if (canvas.type === 'error') {
+                    reject(new Error("Resim okunamadı veya yüklenemedi."));
+                    return;
                 }
 
-                const canvas = document.createElement('canvas');
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, width, height);
-
-                // Apply advanced watermark
-                await applyWatermarkToCanvas(ctx, width, height);
+                // applyWatermarkToCanvas iptal edildi, orijinal resmi yüklüyoruz.
 
                 canvas.toBlob((blob) => {
                     resolve(new File([blob], file.name.replace(/\.[^/.]+$/, ".jpg"), {
@@ -600,12 +583,15 @@ function resizeImage(file, maxSize) {
                         lastModified: Date.now()
                     }));
                 }, 'image/jpeg', 0.85);
-            };
-            img.onerror = reject;
-            img.src = e.target.result;
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
+            },
+            {
+                maxWidth: maxSize,
+                maxHeight: maxSize,
+                canvas: true,
+                meta: true, // EXIF verisini oku
+                orientation: true // EXIF bilgisine göre resmi otomatik döndür
+            }
+        );
     });
 }
 

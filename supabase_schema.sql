@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS faces (
 CREATE INDEX IF NOT EXISTS faces_cluster_id_idx ON faces(cluster_id);
 CREATE INDEX IF NOT EXISTS photos_processed_idx ON photos(processed);
 CREATE INDEX IF NOT EXISTS photos_event_id_idx ON photos(event_id);
-CREATE INDEX IF NOT EXISTS faces_embedding_idx ON faces USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+CREATE INDEX IF NOT EXISTS faces_embedding_idx ON faces USING hnsw (embedding vector_cosine_ops);
 
 -- 6. Siparişler (Sepet / Ödeme) Tablosu
 CREATE TABLE IF NOT EXISTS orders (
@@ -108,12 +108,34 @@ ALTER TABLE faces ENABLE ROW LEVEL SECURITY;
 ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE feedbacks ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Allow public all for studios" ON studios FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow public all for events" ON events FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow public all for photos" ON photos FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow public all for faces" ON faces FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow public all for orders" ON orders FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow public all for feedbacks" ON feedbacks FOR ALL USING (true) WITH CHECK (true);
+-- Güvenli RLS Politikaları
+CREATE POLICY "Studios owner policy" ON studios 
+    FOR ALL USING (auth.uid() = auth_id) WITH CHECK (auth.uid() = auth_id);
+
+CREATE POLICY "Events owner policy" ON events 
+    FOR ALL USING (studio_id IN (SELECT id FROM studios WHERE auth_id = auth.uid())) 
+    WITH CHECK (studio_id IN (SELECT id FROM studios WHERE auth_id = auth.uid()));
+CREATE POLICY "Events public read" ON events FOR SELECT USING (status = 'active');
+
+CREATE POLICY "Photos owner policy" ON photos 
+    FOR ALL USING (event_id IN (SELECT id FROM events WHERE studio_id IN (SELECT id FROM studios WHERE auth_id = auth.uid()))) 
+    WITH CHECK (event_id IN (SELECT id FROM events WHERE studio_id IN (SELECT id FROM studios WHERE auth_id = auth.uid())));
+CREATE POLICY "Photos public read" ON photos FOR SELECT USING (true);
+
+CREATE POLICY "Faces owner policy" ON faces 
+    FOR ALL USING (photo_id IN (SELECT id FROM photos WHERE event_id IN (SELECT id FROM events WHERE studio_id IN (SELECT id FROM studios WHERE auth_id = auth.uid())))) 
+    WITH CHECK (photo_id IN (SELECT id FROM photos WHERE event_id IN (SELECT id FROM events WHERE studio_id IN (SELECT id FROM studios WHERE auth_id = auth.uid()))));
+CREATE POLICY "Faces public read" ON faces FOR SELECT USING (true);
+
+CREATE POLICY "Orders owner policy" ON orders 
+    FOR ALL USING (event_id IN (SELECT id FROM events WHERE studio_id IN (SELECT id FROM studios WHERE auth_id = auth.uid()))) 
+    WITH CHECK (event_id IN (SELECT id FROM events WHERE studio_id IN (SELECT id FROM studios WHERE auth_id = auth.uid())));
+CREATE POLICY "Orders public insert" ON orders FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Feedbacks owner policy" ON feedbacks 
+    FOR ALL USING (photo_id IN (SELECT id FROM photos WHERE event_id IN (SELECT id FROM events WHERE studio_id IN (SELECT id FROM studios WHERE auth_id = auth.uid())))) 
+    WITH CHECK (photo_id IN (SELECT id FROM photos WHERE event_id IN (SELECT id FROM events WHERE studio_id IN (SELECT id FROM studios WHERE auth_id = auth.uid()))));
+CREATE POLICY "Feedbacks public insert" ON feedbacks FOR INSERT WITH CHECK (true);
 
 -- Önemli Hata Çözümü: RLS açık bile olsa service_role ve anon'a temel yetkiler verilmelidir.
 GRANT ALL ON public.orders TO anon, authenticated, service_role;
